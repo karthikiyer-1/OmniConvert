@@ -83,6 +83,35 @@ browser's site data deletes accounts on that device. Cross-device accounts
 would need a backend (for example Supabase or Vercel Postgres with an auth
 provider).
 
+## Accessibility & interface quality
+
+OmniConvert is checked against [Vercel's Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines)
+(installed as the `web-design-guidelines` agent skill) and scanned with axe-core
+on every screen in light and dark mode.
+
+- A skip link, a heading on every page, landmarks, and labelled controls.
+  Decorative icons are hidden from screen readers. Toasts and status
+  changes are announced.
+- Everything works from the keyboard: file rows are buttons, menus support
+  arrow keys, dialogs trap focus and give it back when they close, and there
+  are keyboard alternatives for drag gestures (crop, pan, trim).
+- Text meets WCAG AA contrast in both themes. Focus rings are always visible
+  when using the keyboard.
+- Forms: errors appear next to the field they're about, focus moves to the
+  first error, the submit button stays enabled until you submit and then
+  shows a spinner, and fields have the right `autocomplete`, `inputmode` and
+  `name` so password managers work.
+- Removing or clearing files can be undone. Removing everything and clearing
+  your history ask for confirmation first. You're warned before leaving with
+  unsaved edits.
+- The URL holds the filter, search, open preview and sign-in/sign-up tab, so
+  any view can be linked or reloaded.
+- Respects `prefers-reduced-motion` (CSS and Framer Motion) and animates
+  only `transform` and `opacity`. Long lists skip rendering off-screen rows
+  with `content-visibility`.
+- Notch-safe layout, `theme-color`, `touch-action: manipulation`, and
+  dates, times and numbers formatted with `Intl`.
+
 ## Real and simulated conversions
 
 The browser does these conversions itself (marked **On-device** in the
@@ -119,6 +148,8 @@ the simulated path in `src/lib/store.ts` (`runJob`).
 | `Esc` | Close the preview |
 | `←` / `→` | Previous / next file in the preview |
 | `+` `−` `0` `1` `R` | Image zoom in / out / fit / 1:1 / rotate |
+| `Shift` + arrows | Pan a zoomed image |
+| Arrows / `Alt` + arrows | Move / resize the crop box (`Enter` applies, `Esc` cancels) |
 | `Space` `J` `L` `M` `F` | Media play / back / forward / mute / fullscreen |
 
 ## Project layout

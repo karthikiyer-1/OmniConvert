@@ -55,6 +55,7 @@ export interface Toast {
   title: string;
   body?: string;
   tone: "info" | "success" | "error";
+  action?: { label: string; run: () => void };
 }
 
 interface State {
@@ -185,17 +186,37 @@ export const useStore = create<State>()((set, get) => ({
       retry: (id) => get().start([id]),
 
       remove: (id) => {
-        const gone = get().items.find((it) => it.id === id);
-        if (gone) get().log("removed", gone.output?.name ?? gone.name);
+        const index = get().items.findIndex((it) => it.id === id);
+        const gone = get().items[index];
+        if (!gone) return;
         controllers.get(id)?.abort();
         controllers.delete(id);
         set((s) => ({
           items: s.items.filter((it) => it.id !== id),
           previewId: s.previewId === id ? null : s.previewId,
         }));
-        deleteBlob(origKey(id));
-        deleteBlob(outKey(id));
         pump();
+        const name = gone.output?.name ?? gone.name;
+        get().log("removed", name);
+        // Keep the bytes for a few seconds so the removal can be undone.
+        const token = scheduleBlobDeletion([id]);
+        get().toast({
+          tone: "info",
+          title: `Removed ${name}`,
+          action: {
+            label: "Undo",
+            run: () => {
+              if (!cancelBlobDeletion(token)) return;
+              set((s) => {
+                const items = [...s.items];
+                items.splice(Math.min(index, items.length), 0, normalize([gone])[0]);
+                // The removal never happened, so drop it from the history too.
+                const i = s.history.findIndex((h) => h.type === "removed" && h.name === name);
+                return { items, history: i < 0 ? s.history : s.history.filter((_, j) => j !== i) };
+              });
+            },
+          },
+        });
       },
 
       clearAll: () => {
@@ -208,12 +229,27 @@ export const useStore = create<State>()((set, get) => ({
       },
 
       clearFinished: () => {
-        const done = get().items.filter((it) => it.status === "ready" || it.status === "failed");
-        done.forEach((it) => {
-          deleteBlob(origKey(it.id));
-          deleteBlob(outKey(it.id));
-        });
+        const before = get().items;
+        const done = before.filter((it) => it.status === "ready" || it.status === "failed");
+        if (!done.length) return;
         set((s) => ({ items: s.items.filter((it) => !done.includes(it)) }));
+        const token = scheduleBlobDeletion(done.map((d) => d.id));
+        get().toast({
+          tone: "info",
+          title: `Cleared ${done.length} finished file${done.length > 1 ? "s" : ""}`,
+          action: {
+            label: "Undo",
+            run: () => {
+              if (!cancelBlobDeletion(token)) return;
+              // Put each file back at its original position.
+              set((s) => {
+                const items = [...s.items];
+                done.forEach((d) => items.splice(Math.min(before.indexOf(d), items.length), 0, d));
+                return { items };
+              });
+            },
+          },
+        });
       },
 
       openPreview: (id) => set({ previewId: id }),
@@ -221,15 +257,55 @@ export const useStore = create<State>()((set, get) => ({
       toast: (t) => {
         const id = uid();
         set((s) => ({ toasts: [...s.toasts.slice(-3), { ...t, id }] }));
-        setTimeout(() => get().dismissToast(id), t.tone === "error" ? 6000 : 3200);
+        setTimeout(() => get().dismissToast(id), t.action ? 7000 : t.tone === "error" ? 6000 : 3200);
       },
       dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }));
 
+/* ------------------------------------------------- deferred blob deletion */
+
+const UNDO_MS = 7000;
+const pendingDeletes = new Map<string, { timer: number; ids: string[] }>();
+
+function deleteNow(ids: string[]) {
+  ids.forEach((id) => {
+    deleteBlob(origKey(id));
+    deleteBlob(outKey(id));
+  });
+}
+
+function scheduleBlobDeletion(ids: string[]): string {
+  const token = uid();
+  const timer = window.setTimeout(() => {
+    pendingDeletes.delete(token);
+    deleteNow(ids);
+  }, UNDO_MS);
+  pendingDeletes.set(token, { timer, ids });
+  return token;
+}
+
+/** Returns false if the window already closed. */
+function cancelBlobDeletion(token: string): boolean {
+  const p = pendingDeletes.get(token);
+  if (!p) return false;
+  window.clearTimeout(p.timer);
+  pendingDeletes.delete(token);
+  return true;
+}
+
+/** Finish pending deletions now — call before switching vaults. */
+export function commitPendingDeletions() {
+  pendingDeletes.forEach((p) => {
+    window.clearTimeout(p.timer);
+    deleteNow(p.ids);
+  });
+  pendingDeletes.clear();
+}
+
 /** Work in flight when the page closed (or the account switched) can't resume mid-stream. */
 function normalize(items: FileItem[]): FileItem[] {
   return items.map((it) => {
-    if (it.status === "uploading") return { ...it, status: "failed", progress: 0, stage: undefined, error: "Interrupted before it finished adding" };
+    if (it.status === "uploading") return { ...it, status: "failed", progress: 0, stage: undefined, error: "Adding was interrupted. Remove it and add the file again." };
     if (it.status === "queued" || it.status === "converting") return { ...it, status: "pending", progress: 0, stage: undefined, error: undefined };
     return it;
   });
@@ -267,7 +343,7 @@ async function ingest(item: FileItem, file: File) {
     if (!alive()) return;
     update(item.id, { status: "pending", progress: 0, sha256: hash, ...meta });
   } catch (e) {
-    update(item.id, { status: "failed", error: `Could not read file: ${(e as Error).message}` });
+    update(item.id, { status: "failed", error: `Couldn’t read this file (${(e as Error).message}). Try adding it again.` });
   }
 }
 
@@ -352,7 +428,7 @@ async function runJob(id: string) {
   try {
     update({ status: "converting", progress: 0, stage: "Connecting to engine…" });
     const source = await getBlob(origKey(id));
-    if (!source) throw new Error("Source file is missing from local storage");
+    if (!source) throw new Error("The original file is missing. Add it again from your device.");
 
     // Simulated streams scale with size; real ones finish when the work does.
     const workMs = Math.min(9000, 1400 + item.size / 900_000);
@@ -374,7 +450,7 @@ async function runJob(id: string) {
       await job;
       if (failure) {
         // JSON/CSV parse errors are user-data problems: fail loudly.
-        if (failure instanceof SyntaxError) throw new Error(`Invalid input: ${failure.message}`);
+        if (failure instanceof SyntaxError) throw new Error(`The file isn’t valid (${failure.message}). Fix it in the Open tab, then convert again.`);
         simulated = true;
         note = `Native encoder unavailable (${(failure as Error).message}). Used the cloud fallback stream.`;
         update({ stage: "Falling back to cloud worker…" });
@@ -391,7 +467,7 @@ async function runJob(id: string) {
         await ramp(from, to, workMs / chunks, `Transcoding to ${target.toUpperCase()} · segment ${c + 1}/${chunks}`);
         if (Math.random() < (hiccups ? 0.25 : 0.1)) {
           hiccups++;
-          if (hiccups > 3) throw new Error("Remote worker timed out after 3 retries");
+          if (hiccups > 3) throw new Error("The conversion service timed out after 3 attempts. Try again in a moment.");
           update({ stage: `Stream interrupted — retrying (${hiccups}/3)…` });
           await sleep(900 + hiccups * 400);
           c--; // replay the segment
@@ -427,7 +503,12 @@ async function runJob(id: string) {
     if (e instanceof Cancelled || ctrl.signal.aborted) return;
     useStore.getState().update(id, { status: "failed", stage: undefined, error: (e as Error).message });
     useStore.getState().log("failed", item.name, (e as Error).message);
-    useStore.getState().toast({ tone: "error", title: `Couldn't convert ${item.name}`, body: (e as Error).message });
+    useStore.getState().toast({
+      tone: "error",
+      title: `Couldn’t convert ${item.name}`,
+      body: (e as Error).message,
+      action: { label: "Retry", run: () => useStore.getState().retry(id) },
+    });
   } finally {
     controllers.delete(id);
     const s = useStore.getState();

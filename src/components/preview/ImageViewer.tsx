@@ -75,6 +75,15 @@ export function ImageViewer({ url, name }: { url: string; name: string }) {
       else if (e.key === "0") resetFit();
       else if (e.key === "1") zoomTo(1);
       else if (e.key.toLowerCase() === "r") setRot((r) => r + 90);
+      else if (e.key.startsWith("Arrow") && e.shiftKey) {
+        // Shift+arrows pan (plain arrows switch files in the preview).
+        e.preventDefault();
+        const d = 48;
+        setPos((p) => ({
+          x: p.x + (e.key === "ArrowLeft" ? d : e.key === "ArrowRight" ? -d : 0),
+          y: p.y + (e.key === "ArrowUp" ? d : e.key === "ArrowDown" ? -d : 0),
+        }));
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -86,6 +95,7 @@ export function ImageViewer({ url, name }: { url: string; name: string }) {
     <div
       ref={box}
       className="relative h-full w-full touch-none select-none overflow-hidden"
+      aria-describedby="image-viewer-help"
       style={{
         backgroundImage:
           "linear-gradient(45deg, rgb(var(--fg)/0.025) 25%, transparent 25%), linear-gradient(-45deg, rgb(var(--fg)/0.025) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgb(var(--fg)/0.025) 75%), linear-gradient(-45deg, transparent 75%, rgb(var(--fg)/0.025) 75%)",
@@ -112,10 +122,16 @@ export function ImageViewer({ url, name }: { url: string; name: string }) {
         else zoomTo(Math.max(fit * 2.5, 1), e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2);
       }}
     >
+      <p id="image-viewer-help" className="sr-only">
+        Use + and − to zoom, Shift plus arrow keys to pan, 0 to fit, 1 for actual size, R to rotate.
+      </p>
       <div className="absolute inset-0 flex items-center justify-center">
         <motion.img
           src={url}
           alt={name}
+          width={natural?.w}
+          height={natural?.h}
+          decoding="async"
           draggable={false}
           onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth || 800, h: e.currentTarget.naturalHeight || 600 })}
           initial={{ opacity: 0 }}
@@ -139,23 +155,23 @@ export function ImageViewer({ url, name }: { url: string; name: string }) {
         onDoubleClick={(e) => e.stopPropagation()}
       >
         <button className="icon-btn rounded-full" onClick={() => zoomTo(scale / 1.25)} title="Zoom out (−)">
-          <Minus size={15} />
+          <Minus aria-hidden size={15} />
         </button>
         <button className="w-14 text-center text-caption font-medium tabular-nums" onClick={() => zoomTo(1)} title="Actual size (1)">
           {pct}%
         </button>
         <button className="icon-btn rounded-full" onClick={() => zoomTo(scale * 1.25)} title="Zoom in (+)">
-          <Plus size={15} />
+          <Plus aria-hidden size={15} />
         </button>
         <span className="mx-1 h-4 w-px bg-fg/10" />
         <button className="icon-btn rounded-full" onClick={resetFit} title="Fit (0)">
-          <Maximize size={14} />
+          <Maximize aria-hidden size={14} />
         </button>
         <button className="icon-btn rounded-full" onClick={() => zoomTo(1)} title="Actual pixels (1)">
-          <Scan size={14} />
+          <Scan aria-hidden size={14} />
         </button>
         <button className="icon-btn rounded-full" onClick={() => setRot((r) => r + 90)} title="Rotate (R)">
-          <RotateCw size={14} />
+          <RotateCw aria-hidden size={14} />
         </button>
       </div>
       {natural && (

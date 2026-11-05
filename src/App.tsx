@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
-import { AnimatePresence } from "framer-motion";
-import { motion } from "framer-motion";
+import { MotionConfig, motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
 import { useStore } from "@/lib/store";
 import { t } from "@/lib/motion";
@@ -15,12 +14,29 @@ import { useAuth } from "@/lib/auth";
 import { flush, startAutosave } from "@/lib/persistence";
 import { navigate, useRoute } from "@/lib/router";
 import { useOpener } from "@/lib/opener";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export default function App() {
   const { theme, toggle } = useTheme();
   const workspace = useRef<WorkspaceHandle>(null);
   const route = useRoute();
   const authStatus = useAuth((s) => s.status);
+
+  // Browser UI colour follows the page background.
+  useEffect(() => {
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#000000" : "#f5f5f7");
+  }, [theme]);
+
+  // Warn before leaving with unsaved edits in the Open tab.
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!useOpener.getState().dirty) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
 
   // Load the signed-in account (or guest data), then keep it saved.
   useEffect(() => {
@@ -104,50 +120,60 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-full">
-      <Header theme={theme} onToggleTheme={toggle} />
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-full">
+        <a href="#main" className="skip-link" onClick={(e) => {
+          e.preventDefault();
+          document.getElementById("main")?.focus();
+        }}>
+          Skip to content
+        </a>
+        <Header theme={theme} onToggleTheme={toggle} />
 
-      <main className="mx-auto max-w-[1200px] px-6 md:px-10">
-        {authStatus === "loading" ? (
-          <div className="h-[60vh]" aria-busy />
-        ) : (
-          <AnimatePresence mode="wait" initial={false}>
-            <div key={route}>
-              {route === "convert" && (
-                <>
-                  <motion.section
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={t.slow}
-                    className="pb-12 pt-16 md:pb-16 md:pt-24"
-                  >
-                    <h1 className="font-display text-headline font-semibold md:text-hero">Convert anything.</h1>
-                    <p className="mt-4 max-w-[560px] text-lead text-muted md:mt-6">
-                      Drop in a file, pick a format, done. Images, video, audio, documents and data — converted and previewed
-                      right in your browser.
-                    </p>
-                  </motion.section>
-                  <div className="grid gap-6 pb-24 lg:grid-cols-[minmax(0,1fr)_400px]">
-                    <Workspace ref={workspace} />
-                    <Shelf />
-                  </div>
-                </>
-              )}
-              {route === "open" && <OpenerPage />}
-              {route === "account" && <AccountPage />}
-            </div>
-          </AnimatePresence>
-        )}
-      </main>
+        <main id="main" tabIndex={-1} className="mx-auto max-w-[1200px] px-6 outline-none md:px-10">
+          {authStatus === "loading" ? (
+            <div className="h-[60vh]" aria-busy="true" />
+          ) : (
+            <>
+              {/* Pages stay mounted so switching tabs never loses an in-progress edit. */}
+              <div hidden={route !== "convert"}>
+                <motion.section
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={t.slow}
+                  className="pb-12 pt-16 md:pb-16 md:pt-24"
+                >
+                  <h1 className="text-balance font-display text-headline font-semibold md:text-hero">Convert Anything.</h1>
+                  <p className="mt-4 max-w-[560px] text-pretty text-lead text-muted md:mt-6">
+                    Drop in a file, pick a format, done. Images, video, audio, documents &amp; data, converted and previewed
+                    right in your browser.
+                  </p>
+                </motion.section>
+                <div className="grid gap-6 pb-24 lg:grid-cols-[minmax(0,1fr)_400px]">
+                  <Workspace ref={workspace} />
+                  <Shelf />
+                </div>
+              </div>
+              <div hidden={route !== "open"}>
+                <OpenerPage />
+              </div>
+              <div hidden={route !== "account"}>
+                <AccountPage />
+              </div>
+            </>
+          )}
+        </main>
 
-      <footer className="mx-auto max-w-[1200px] px-6 pb-12 md:px-10">
-        <p className="text-caption text-subtle" style={{ boxShadow: "0 -1px 0 var(--hairline)", paddingTop: 16 }}>
-          Your files never leave this device. Signed-in accounts are encrypted with a key only your password unlocks.
-        </p>
-      </footer>
+        <footer className="mx-auto max-w-[1200px] px-6 pb-12 md:px-10" style={{ paddingBottom: "max(48px, env(safe-area-inset-bottom))" }}>
+          <p className="text-pretty text-caption text-subtle" style={{ boxShadow: "0 -1px 0 var(--hairline)", paddingTop: 16 }}>
+            Your files never leave this device. Signed-in accounts are encrypted with a key only your password unlocks.
+          </p>
+        </footer>
 
-      <PreviewModal />
-      <Toasts />
-    </div>
+        <PreviewModal />
+        <ConfirmDialog />
+        <Toasts />
+      </div>
+    </MotionConfig>
   );
 }

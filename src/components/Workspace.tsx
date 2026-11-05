@@ -81,10 +81,9 @@ export const Workspace = forwardRef<WorkspaceHandle>(function Workspace(_, ref) 
         onClick={() => inputRef.current?.click()}
         role="button"
         tabIndex={0}
-        aria-label="Add files"
         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
         className={cn(
-          "surface group relative flex min-h-[360px] cursor-pointer flex-col items-center justify-center px-8 py-16 text-center outline-none transition-colors duration-400 ease-apple",
+          "surface group relative flex min-h-[360px] cursor-pointer flex-col items-center justify-center px-8 py-16 text-center transition-colors duration-400 ease-apple focus-visible:outline-offset-[-6px]",
           drag && "!bg-accent/[0.04]",
         )}
       >
@@ -98,24 +97,26 @@ export const Workspace = forwardRef<WorkspaceHandle>(function Workspace(_, ref) 
 
         <div
           className={cn(
-            "mb-8 flex h-16 w-16 items-center justify-center rounded-full transition-all duration-400 ease-apple",
+            "mb-8 flex h-16 w-16 items-center justify-center rounded-full transition-[transform,background-color,color] duration-400 ease-apple",
             drag ? "-translate-y-1 bg-accent text-white" : "bg-fg/[0.05] text-fg group-hover:-translate-y-0.5",
           )}
         >
-          <ArrowUp size={26} strokeWidth={1.75} />
+          <ArrowUp aria-hidden size={26} strokeWidth={1.75} />
         </div>
 
-        <p className="font-display text-title font-semibold">{drag ? "Release to add" : "Drop files here"}</p>
+        <p className="font-display text-title font-semibold">{drag ? "Release to Add" : "Drop Files Here"}</p>
         <p className="mt-2 text-callout text-muted">
           or <span className="text-accent transition-opacity group-hover:opacity-80">choose files</span> from your device
         </p>
         <p className="mt-10 flex items-center gap-2 text-footnote text-subtle">
-          Paste with <span className="kbd">⌘ V</span>
+          Paste with <span className="kbd">⌘&nbsp;V</span>
         </p>
 
         <input
           ref={inputRef}
           type="file"
+          aria-label="Choose files"
+          tabIndex={-1}
           multiple
           hidden
           onChange={(e) => {
@@ -127,13 +128,18 @@ export const Workspace = forwardRef<WorkspaceHandle>(function Workspace(_, ref) 
       </motion.div>
 
       {/* Conversion panel */}
-      <motion.div {...rise} transition={{ ...t.slow, delay: 0.1 }} className="surface p-6 md:p-8">
+      <motion.section {...rise} transition={{ ...t.slow, delay: 0.1 }} className="surface p-6 md:p-8" aria-labelledby="convert-heading">
+        <h2 id="convert-heading" className="sr-only">
+          Conversion settings
+        </h2>
         <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
           <div>
             <p className="text-footnote text-muted">From</p>
-            <p className="mt-1 font-display text-lead font-semibold">{from}</p>
+            <p className="mt-1 font-display text-lead font-semibold" translate="no">
+              {from}
+            </p>
           </div>
-          <ArrowRight size={20} strokeWidth={1.5} className="mb-1.5 text-subtle" />
+          <ArrowRight aria-hidden size={20} strokeWidth={1.5} className="mb-1.5 text-subtle" />
           <div>
             <p className="mb-1 text-footnote text-muted">To</p>
             <FormatSelect
@@ -144,13 +150,13 @@ export const Workspace = forwardRef<WorkspaceHandle>(function Workspace(_, ref) 
               onChange={(ext) => {
                 const n = setTargetForPending(ext);
                 if (n < staged.length)
-                  toast({ tone: "info", title: `${ext.toUpperCase()} set for ${n} of ${staged.length}`, body: "Others don't support it" });
+                  toast({ tone: "info", title: `${ext.toUpperCase()} set for ${n} of ${staged.length}`, body: "Pick a format for the others in the list below" });
               }}
             />
           </div>
           <div className="w-full sm:ml-auto sm:w-auto">
             <button className="btn-primary w-full sm:w-auto" disabled={!startable.length} onClick={() => start()}>
-              Convert{startable.length > 1 ? ` ${startable.length} files` : ""}
+              {startable.length > 1 ? `Convert ${startable.length} Files` : "Convert"}
             </button>
           </div>
         </div>
@@ -174,20 +180,22 @@ export const Workspace = forwardRef<WorkspaceHandle>(function Workspace(_, ref) 
                       layout="position"
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, height: 0, transition: t.fast }}
+                      exit={{ opacity: 0, transition: t.fast }}
                       transition={t.base}
-                      className="flex items-center gap-4 rounded-2xl px-3 py-2.5 transition-colors duration-200 hover:bg-fg/[0.03]"
+                      className="cv-row flex items-center gap-4 rounded-2xl px-3 py-2.5 transition-colors duration-200 hover:bg-fg/[0.03]"
                     >
                       <FileIcon kind={it.kind} size={40} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-body font-medium">{it.name}</p>
-                        <p className="text-footnote text-muted">
+                        <p className="truncate text-body font-medium" translate="no">
+                          {it.name}
+                        </p>
+                        <p className="text-footnote tabular-nums text-muted">
                           {it.status === "uploading" ? `Adding… ${it.progress}%` : `${KIND_LABEL[it.kind]} · ${formatBytes(it.size)}`}
                         </p>
                       </div>
                       <FormatSelect size="sm" options={opts} value={it.target} onChange={(ext) => setTarget(it.id, ext)} />
                       <button className="icon-btn" onClick={() => remove(it.id)} aria-label={`Remove ${it.name}`}>
-                        <X size={16} strokeWidth={1.75} />
+                        <X aria-hidden size={16} strokeWidth={1.75} />
                       </button>
                     </motion.li>
                   );
@@ -212,7 +220,7 @@ export const Workspace = forwardRef<WorkspaceHandle>(function Workspace(_, ref) 
             </motion.dl>
           )}
         </AnimatePresence>
-      </motion.div>
+      </motion.section>
     </section>
   );
 });

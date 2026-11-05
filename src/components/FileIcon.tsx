@@ -24,7 +24,7 @@ export function FileIcon({ kind, size = 44, className }: { kind: FileKind; size?
       className={cn("flex shrink-0 items-center justify-center bg-fg/[0.05] text-muted", className)}
       style={{ width: size, height: size, borderRadius: Math.round(size * 0.27) }}
     >
-      <Icon size={Math.round(size * 0.42)} strokeWidth={1.5} />
+      <Icon aria-hidden size={Math.round(size * 0.42)} strokeWidth={1.5} />
     </div>
   );
 }

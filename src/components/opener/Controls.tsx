@@ -31,7 +31,7 @@ export function Slider({
     <label className="block py-1.5">
       <span className="flex justify-between text-footnote">
         <span>{label}</span>
-        <span className="tabular-nums text-muted">
+        <span className="tabular-nums text-muted" aria-hidden>
           {Number.isInteger(step) ? value : value.toFixed(1)}
           {unit}
         </span>
@@ -39,6 +39,7 @@ export function Slider({
       <input
         type="range"
         className="slider mt-2 w-full"
+        aria-valuetext={`${value}${unit}`}
         min={min}
         max={max}
         step={step}
@@ -77,12 +78,30 @@ export function Choice<T extends string | number>({
   );
 }
 
-export function NumberField({ label, value, onChange, suffix }: { label: string; value: number; onChange: (v: number) => void; suffix?: string }) {
+export function NumberField({
+  label,
+  value,
+  onChange,
+  suffix,
+  name,
+  ariaLabel,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  suffix?: string;
+  name: string;
+  ariaLabel: string;
+}) {
   return (
     <label className="flex h-10 flex-1 items-center gap-2 rounded-xl bg-fg/[0.05] px-3 text-footnote focus-within:ring-2 focus-within:ring-accent/40">
       <span className="text-muted">{label}</span>
       <input
         type="number"
+        inputMode="numeric"
+        name={name}
+        autoComplete="off"
+        aria-label={ariaLabel}
         min={1}
         value={Number.isFinite(value) ? value : ""}
         onChange={(e) => onChange(Math.max(1, Math.round(+e.target.value || 1)))}

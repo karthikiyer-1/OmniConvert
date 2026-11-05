@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { FlipHorizontal2, FlipVertical2, Lock, RotateCcw, RotateCw, Undo2, Unlock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
-import type { OpenFile } from "@/lib/opener";
+import { useOpener, type OpenFile } from "@/lib/opener";
 import { Choice, NumberField, Section, Slider } from "./Controls";
 import { download, editedName, saveToFiles } from "./actions";
 import { InfoCard } from "../preview/FallbackViews";
@@ -70,6 +70,15 @@ export function ImageEditor({ file }: { file: OpenFile }) {
   const [format, setFormat] = useState<Format>(file.ext === "jpg" || file.ext === "jpeg" ? "jpg" : file.ext === "webp" ? "webp" : "png");
   const [quality, setQuality] = useState(90);
   const [box, setBox] = useState({ w: 800, h: 600 });
+  const setDirty = useOpener((s) => s.setDirty);
+  const adjustKey = JSON.stringify(adjust);
+  const [saved, setSaved] = useState({ steps: 0, adjust: JSON.stringify(NEUTRAL) });
+
+  // Unsaved = the edit stack or adjustments differ from the last load/save.
+  useEffect(() => {
+    setDirty(undo.length !== saved.steps || adjustKey !== saved.adjust);
+  }, [undo.length, adjustKey, saved, setDirty]);
+  useEffect(() => () => setDirty(false), [setDirty]);
 
   // Load the image into the working canvas.
   useEffect(() => {
@@ -90,7 +99,7 @@ export function ImageEditor({ file }: { file: OpenFile }) {
         setResize({ w: c.width, h: c.height, lock: true });
         setVersion((v) => v + 1);
       })
-      .catch(() => !cancelled && setError("This browser can't open this image type for editing."))
+      .catch(() => !cancelled && setError("This browser can’t edit this image type. Convert it to PNG or JPG first, then open it here."))
       .finally(() => URL.revokeObjectURL(url));
     return () => {
       cancelled = true;
@@ -220,8 +229,8 @@ export function ImageEditor({ file }: { file: OpenFile }) {
       ctx.putImageData(data, 0, 0);
     }
     const blob = await new Promise<Blob | null>((res) => c.toBlob(res, MIME[format], quality / 100));
-    if (!blob) throw new Error("Couldn't encode the image");
-    if (format === "webp" && blob.type !== "image/webp") throw new Error("This browser can't save WEBP — choose PNG or JPG");
+    if (!blob) throw new Error("Couldn’t encode the image. Try PNG, or a smaller size.");
+    if (format === "webp" && blob.type !== "image/webp") throw new Error("This browser can’t save WEBP. Choose PNG or JPG instead.");
     return blob;
   };
 
@@ -234,8 +243,10 @@ export function ImageEditor({ file }: { file: OpenFile }) {
         saveToFiles(blob, name, `${size.w} × ${size.h}`);
         toast({ tone: "success", title: "Saved to Files", body: name });
       }
+      // Either way the edits are now kept somewhere.
+      setSaved({ steps: undo.length, adjust: adjustKey });
     } catch (e) {
-      toast({ tone: "error", title: "Couldn't save", body: (e as Error).message });
+      toast({ tone: "error", title: "Couldn’t save the image", body: (e as Error).message });
     }
   };
 
@@ -276,6 +287,29 @@ export function ImageEditor({ file }: { file: OpenFile }) {
   };
   const onCropUp = () => (drag.current = null);
 
+  /** Keyboard alternative to dragging: arrows move, Shift = 10px, Alt+arrows resize. */
+  const onCropKey = (e: React.KeyboardEvent) => {
+    if (!crop || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", "Escape"].includes(e.key)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === "Enter") return applyCrop();
+    if (e.key === "Escape") return setCrop(null);
+    const step = e.shiftKey ? 10 : 1;
+    const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+    const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+    const ratio = RATIO[aspect];
+    let { x, y, w, h } = crop;
+    if (e.altKey) {
+      w = Math.max(16, Math.min(size.w - x, w + dx + (ratio ? dy * ratio : 0)));
+      h = ratio ? w / ratio : Math.max(16, Math.min(size.h - y, h + dy));
+      if (y + h > size.h) { h = size.h - y; if (ratio) w = h * ratio; }
+    } else {
+      x = Math.max(0, Math.min(size.w - w, x + dx));
+      y = Math.max(0, Math.min(size.h - h, y + dy));
+    }
+    setCrop({ x, y, w, h });
+  };
+
   if (error) return <InfoCard kind="image" name={file.name} blob={file.blob} message={error} />;
 
   const filter = `brightness(${adjust.brightness}%) contrast(${adjust.contrast}%) saturate(${adjust.saturation}%) grayscale(${adjust.grayscale}%)`;
@@ -283,13 +317,17 @@ export function ImageEditor({ file }: { file: OpenFile }) {
   return (
     <div className="flex h-full min-h-0 flex-col lg:flex-row">
       {/* Canvas */}
-      <div ref={stage} className="relative flex min-h-[360px] flex-1 items-center justify-center overflow-hidden bg-bg/60">
+      <div ref={stage} className="relative flex min-h-[360px] flex-1 select-none items-center justify-center overflow-hidden bg-bg/60">
         <div className="relative" style={{ width: size.w * scale, height: size.h * scale }}>
-          <canvas ref={view} className="block h-full w-full" style={{ filter }} />
+          <canvas ref={view} className="block h-full w-full" style={{ filter }} role="img" aria-label={`${file.name}, ${size.w} by ${size.h} pixels`} />
           {crop && (
             <div className="absolute inset-0 overflow-hidden" onPointerMove={onCropMove} onPointerUp={onCropUp}>
               <div
-                className="absolute cursor-move"
+                className="absolute cursor-move touch-none focus-visible:outline-offset-2"
+                tabIndex={0}
+                role="group"
+                aria-label={`Crop area ${Math.round(crop.w)} by ${Math.round(crop.h)}. Arrow keys move, Alt plus arrows resize, Enter applies, Escape cancels.`}
+                onKeyDown={onCropKey}
                 style={{
                   left: crop.x * scale,
                   top: crop.y * scale,
@@ -308,6 +346,7 @@ export function ImageEditor({ file }: { file: OpenFile }) {
                 {(["nw", "ne", "sw", "se"] as const).map((m) => (
                   <div
                     key={m}
+                    aria-hidden
                     onPointerDown={onCropDown(m)}
                     className={cn(
                       "absolute h-5 w-5",
@@ -327,7 +366,7 @@ export function ImageEditor({ file }: { file: OpenFile }) {
           )}
         </div>
         <div className="material absolute left-6 top-6 rounded-full px-3 py-1 text-caption text-muted">
-          {crop ? `${Math.round(crop.w)} × ${Math.round(crop.h)}` : `${size.w} × ${size.h}`}
+          {crop ? `${Math.round(crop.w)}\u00A0×\u00A0${Math.round(crop.h)}` : `${size.w}\u00A0×\u00A0${size.h}`}
         </div>
       </div>
 
@@ -344,7 +383,7 @@ export function ImageEditor({ file }: { file: OpenFile }) {
               ] as const
             ).map(([k, Icon, label]) => (
               <button key={k} className="btn-secondary h-10 px-0" onClick={() => transform(k)} title={label} aria-label={label}>
-                <Icon size={17} strokeWidth={1.75} />
+                <Icon aria-hidden size={17} strokeWidth={1.75} />
               </button>
             ))}
           </div>
@@ -372,7 +411,7 @@ export function ImageEditor({ file }: { file: OpenFile }) {
                   Cancel
                 </button>
                 <button className="btn-secondary flex-1 !bg-fg !text-bg hover:!bg-fg/85" onClick={applyCrop}>
-                  Apply crop
+                  Apply Crop
                 </button>
               </>
             ) : (
@@ -394,6 +433,8 @@ export function ImageEditor({ file }: { file: OpenFile }) {
           <div className="flex items-center gap-2">
             <NumberField
               label="W"
+              name="resize-width"
+              ariaLabel="Width in pixels"
               value={resize.w}
               onChange={(w) => setResize((r) => ({ ...r, w, h: r.lock ? Math.max(1, Math.round((w * size.h) / size.w)) : r.h }))}
             />
@@ -402,16 +443,18 @@ export function ImageEditor({ file }: { file: OpenFile }) {
               onClick={() => setResize((r) => ({ ...r, lock: !r.lock }))}
               aria-label={resize.lock ? "Unlock aspect ratio" : "Lock aspect ratio"}
             >
-              {resize.lock ? <Lock size={15} strokeWidth={1.75} /> : <Unlock size={15} strokeWidth={1.75} />}
+              {resize.lock ? <Lock aria-hidden size={15} strokeWidth={1.75} /> : <Unlock aria-hidden size={15} strokeWidth={1.75} />}
             </button>
             <NumberField
               label="H"
+              name="resize-height"
+              ariaLabel="Height in pixels"
               value={resize.h}
               onChange={(h) => setResize((r) => ({ ...r, h, w: r.lock ? Math.max(1, Math.round((h * size.w) / size.h)) : r.w }))}
             />
           </div>
           <button className="btn-secondary mt-3 w-full" disabled={resize.w === size.w && resize.h === size.h} onClick={applyResize}>
-            Apply size
+            Apply Size
           </button>
         </Section>
 
@@ -437,7 +480,7 @@ export function ImageEditor({ file }: { file: OpenFile }) {
           </div>
           <div className="mt-2 flex gap-2">
             <button className="btn-text flex-1 text-muted hover:text-fg" disabled={!undo.length} onClick={doUndo}>
-              <Undo2 size={14} strokeWidth={1.75} /> Undo
+              <Undo2 aria-hidden size={14} strokeWidth={1.75} /> Undo
             </button>
             <button className="btn-text flex-1 text-muted hover:text-fg" onClick={reset}>
               Reset

@@ -23,11 +23,10 @@ export async function openLibraryItem(item: FileItem) {
   const useOut = item.status === "ready" && item.output && !item.output.simulated;
   const blob = await getBlob(useOut ? outKey(item.id) : origKey(item.id));
   if (!blob) {
-    useStore.getState().toast({ tone: "error", title: "File not found", body: "It was cleared from browser storage" });
+    useStore.getState().toast({ tone: "error", title: "File data is missing", body: "Add the file again from your device" });
     return false;
   }
-  useOpener.getState().open(blob, useOut ? item.output!.name : item.name, item.id);
-  return true;
+  return useOpener.getState().open(blob, useOut ? item.output!.name : item.name, item.id);
 }
 
 function OpenLanding() {
@@ -46,8 +45,8 @@ function OpenLanding() {
   return (
     <>
       <motion.section {...rise} transition={t.slow} className="pb-12 pt-16 md:pb-16 md:pt-24">
-        <h1 className="font-display text-headline font-semibold md:text-hero">Open anything.</h1>
-        <p className="mt-4 max-w-[560px] text-lead text-muted md:mt-6">
+        <h1 className="text-balance font-display text-headline font-semibold md:text-hero">Open Anything.</h1>
+        <p className="mt-4 max-w-[560px] text-pretty text-lead text-muted md:mt-6">
           View any file, then make quick edits: crop and adjust photos, edit text and code, trim audio, grab frames from video.
         </p>
       </motion.section>
@@ -58,7 +57,6 @@ function OpenLanding() {
           transition={{ ...t.slow, delay: 0.05 }}
           role="button"
           tabIndex={0}
-          aria-label="Open a file"
           onClick={() => input.current?.click()}
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
           onDragEnter={(e) => {
@@ -79,7 +77,7 @@ function OpenLanding() {
             take(e.dataTransfer.files);
           }}
           className={cn(
-            "surface group relative flex min-h-[420px] cursor-pointer flex-col items-center justify-center px-8 py-16 text-center outline-none transition-colors duration-400 ease-apple",
+            "surface group relative flex min-h-[420px] cursor-pointer flex-col items-center justify-center px-8 py-16 text-center transition-colors duration-400 ease-apple focus-visible:outline-offset-[-6px]",
             drag && "!bg-accent/[0.04]",
           )}
         >
@@ -91,20 +89,22 @@ function OpenLanding() {
           />
           <div
             className={cn(
-              "mb-8 flex h-16 w-16 items-center justify-center rounded-full transition-all duration-400 ease-apple",
+              "mb-8 flex h-16 w-16 items-center justify-center rounded-full transition-[transform,background-color,color] duration-400 ease-apple",
               drag ? "-translate-y-1 bg-accent text-white" : "bg-fg/[0.05] text-fg group-hover:-translate-y-0.5",
             )}
           >
-            <ArrowUp size={26} strokeWidth={1.75} />
+            <ArrowUp aria-hidden size={26} strokeWidth={1.75} />
           </div>
-          <p className="font-display text-title font-semibold">{drag ? "Release to open" : "Drop a file to open"}</p>
+          <p className="font-display text-title font-semibold">{drag ? "Release to Open" : "Drop a File to Open"}</p>
           <p className="mt-2 text-callout text-muted">
             or <span className="text-accent">choose a file</span>
           </p>
-          <p className="mt-10 text-footnote text-subtle">Images · Text & code · Audio · Video · PDF · ZIP · anything else</p>
+          <p className="mt-10 text-pretty text-footnote text-subtle">Images · Text &amp; code · Audio · Video · PDF · ZIP · anything else</p>
           <input
             ref={input}
             type="file"
+            aria-label="Choose a file"
+            tabIndex={-1}
             hidden
             onChange={(e) => {
               take(e.target.files);
@@ -114,7 +114,7 @@ function OpenLanding() {
         </motion.div>
 
         <motion.aside {...rise} transition={{ ...t.slow, delay: 0.1 }} className="surface flex min-h-[420px] flex-col p-6">
-          <h2 className="font-display text-title font-semibold">From your files</h2>
+          <h2 className="font-display text-title font-semibold">From Your Files</h2>
           <p className="mt-1 text-footnote text-muted">Pick up where you left off.</p>
           {recent.length ? (
             <ul className="-mx-3 mt-6">
@@ -126,7 +126,7 @@ function OpenLanding() {
                   >
                     <FileIcon kind={it.kind} size={40} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-body font-medium">{it.output?.name ?? it.name}</span>
+                      <span className="block truncate text-body font-medium" translate="no">{it.output?.name ?? it.name}</span>
                       <span className="block text-footnote text-muted">
                         {KIND_LABEL[it.kind]} · {timeAgo(it.addedAt)}
                       </span>
@@ -187,18 +187,18 @@ function OpenFileView({ file }: { file: OpenFile }) {
         <div className="flex h-16 shrink-0 items-center gap-4 px-5" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
           <FileIcon kind={file.kind} size={36} />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-body font-semibold">{file.name}</p>
+            <h1 className="truncate text-body font-semibold" translate="no">{file.name}</h1>
             <p className="truncate text-caption text-muted">
               {mode} · {formatBytes(file.blob.size)}
             </p>
           </div>
           {canTextEdit && (
             <button className="btn-text max-sm:hidden" onClick={() => setAsText(!asText)}>
-              {asText ? "Back to viewer" : "Edit as text"}
+              {asText ? "Back to Viewer" : "Edit as Text"}
             </button>
           )}
-          <button className="icon-btn -mr-1" onClick={close} aria-label="Close file">
-            <X size={18} strokeWidth={1.75} />
+          <button className="icon-btn -mr-1" onClick={() => void close()} aria-label="Close file">
+            <X aria-hidden size={18} strokeWidth={1.75} />
           </button>
         </div>
         <div className="min-h-0 flex-1">{body}</div>

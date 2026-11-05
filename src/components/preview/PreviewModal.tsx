@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronLeft, ChevronRight, Copy, Info, Loader2, X } from "lucide-react";
 import { origKey, outKey, useStore, FileItem } from "@/lib/store";
-import { useStoredBlob } from "@/lib/hooks";
+import { useFocusTrap, useStoredBlob } from "@/lib/hooks";
+import { getParam, setParam } from "@/lib/router";
 import { detectKind, isBrowserImage, isTextual, KIND_LABEL, outputsFor } from "@/lib/formats";
-import { cn, formatBytes, formatDuration } from "@/lib/utils";
+import { cn, formatBytes, formatDateTime, formatDuration } from "@/lib/utils";
 import { t } from "@/lib/motion";
 import { StatusBadge } from "../StatusBadge";
 import { ProgressBar } from "../ProgressBar";
@@ -22,6 +23,19 @@ export function PreviewModal() {
   const items = useStore((s) => s.items);
   const open = useStore((s) => s.openPreview);
   const item = items.find((i) => i.id === previewId);
+  const hydrated = useStore((s) => s.hydrated);
+  const dialog = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialog, !!item);
+
+  // Deep link: #/?file=<id> opens the preview; closing removes it.
+  useEffect(() => {
+    if (!hydrated) return;
+    const id = getParam("file");
+    if (id && useStore.getState().items.some((i) => i.id === id)) open(id);
+  }, [hydrated, open]);
+  useEffect(() => {
+    if (hydrated) setParam("file", item ? item.id : null);
+  }, [item?.id, hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!previewId) return;
@@ -29,6 +43,7 @@ export function PreviewModal() {
       if (document.fullscreenElement) return;
       if ((e.target as HTMLElement)?.closest("input,textarea")) return;
       if (e.key === "Escape") open(null);
+      if (e.shiftKey) return; // Shift+arrows pan images
       const idx = items.findIndex((i) => i.id === previewId);
       if (e.key === "ArrowRight" && idx < items.length - 1) open(items[idx + 1].id);
       if (e.key === "ArrowLeft" && idx > 0) open(items[idx - 1].id);
@@ -47,7 +62,7 @@ export function PreviewModal() {
       {item && (
         <motion.div
           key="backdrop"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[20px] md:p-8"
+          className="fixed inset-0 z-50 flex items-center justify-center overscroll-contain bg-black/30 backdrop-blur-[20px] md:p-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, pointerEvents: "none", transition: t.fast }}
@@ -55,6 +70,7 @@ export function PreviewModal() {
           onClick={() => open(null)}
         >
           <motion.div
+            ref={dialog}
             role="dialog"
             aria-modal
             aria-label={`Preview ${item.name}`}
@@ -63,6 +79,7 @@ export function PreviewModal() {
             exit={{ opacity: 0, scale: 0.98, y: 8, transition: t.fast }}
             transition={t.slow}
             className="relative flex h-full w-full max-w-[1280px] flex-col overflow-hidden bg-surface shadow-modal md:h-[min(880px,92dvh)] md:rounded-card"
+            style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <PreviewBody item={item} items={items} />
@@ -80,7 +97,9 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
   const [view, setView] = useState<"output" | "original">(hasOutput ? "output" : "original");
   const [showInfo, setShowInfo] = useState(() => window.innerWidth >= 1024);
 
-  useEffect(() => setView(hasOutput ? "output" : "original"), [item.id, hasOutput]);
+  useEffect(() => {
+    setView(hasOutput ? "output" : "original");
+  }, [item.id, hasOutput]);
 
   const showingOutput = view === "output" && hasOutput;
   const { blob, url, loading } = useStoredBlob(
@@ -99,12 +118,12 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
   if (item.status === "uploading" || loading) {
     viewer = (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-muted">
-        <Loader2 size={20} strokeWidth={1.75} className="animate-spin" />
+        <Loader2 aria-hidden size={20} strokeWidth={1.75} className="animate-spin" />
         <p className="text-footnote">{item.status === "uploading" ? `Adding… ${item.progress}%` : "Opening…"}</p>
       </div>
     );
   } else if (!blob || !url) {
-    viewer = <InfoCard kind={kind} name={name} message="This file's contents are no longer stored in your browser." />;
+    viewer = <InfoCard kind={kind} name={name} message="This file’s contents are no longer stored in your browser. Add it again from your device to preview it." />;
   } else if (kind === "image" && isBrowserImage(ext)) {
     viewer = <ImageViewer key={url} url={url} name={name} />;
   } else if (kind === "video" || kind === "audio") {
@@ -127,15 +146,17 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
       <div className="flex h-16 shrink-0 items-center gap-2 px-4 md:px-5" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
         <div className="flex items-center max-sm:hidden">
           <button className="icon-btn" disabled={idx <= 0} onClick={() => open(items[idx - 1].id)} aria-label="Previous file">
-            <ChevronLeft size={18} strokeWidth={1.75} />
+            <ChevronLeft aria-hidden size={18} strokeWidth={1.75} />
           </button>
           <button className="icon-btn" disabled={idx >= items.length - 1} onClick={() => open(items[idx + 1].id)} aria-label="Next file">
-            <ChevronRight size={18} strokeWidth={1.75} />
+            <ChevronRight aria-hidden size={18} strokeWidth={1.75} />
           </button>
         </div>
         <div className="min-w-0 flex-1 px-1">
-          <p className="truncate text-body font-semibold">{name}</p>
-          <p className="truncate text-caption text-muted">
+          <h2 className="truncate text-body font-semibold" translate="no">
+            {name}
+          </h2>
+          <p className="truncate text-caption tabular-nums text-muted">
             {KIND_LABEL[kind]} · {formatBytes(showingOutput ? item.output!.size : item.size)}
             {!showingOutput && item.width && item.height ? ` · ${item.width} × ${item.height}` : ""}
             {!showingOutput && item.duration ? ` · ${formatDuration(item.duration)}` : ""}
@@ -173,10 +194,10 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
           Download
         </button>
         <button className={cn("icon-btn", showInfo && "bg-fg/[0.06] text-fg")} onClick={() => setShowInfo((v) => !v)} aria-label="Info" aria-pressed={showInfo}>
-          <Info size={18} strokeWidth={1.75} />
+          <Info aria-hidden size={18} strokeWidth={1.75} />
         </button>
         <button className="icon-btn -mr-1" onClick={() => open(null)} aria-label="Close">
-          <X size={18} strokeWidth={1.75} />
+          <X aria-hidden size={18} strokeWidth={1.75} />
         </button>
       </div>
 
@@ -202,9 +223,10 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
         <AnimatePresence initial={false}>
           {showInfo && (
             <motion.aside
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: "auto", opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
+              aria-label="File info"
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 16 }}
               transition={t.base}
               className="overflow-hidden bg-surface max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-10 max-lg:shadow-modal"
               style={{ boxShadow: "-1px 0 0 var(--hairline)" }}
@@ -243,7 +265,7 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
   const [copied, setCopied] = useState(false);
 
   return (
-    <div className="scroll-thin h-full w-[min(340px,100vw)] overflow-y-auto px-6 py-6">
+    <div className="scroll-thin h-full w-[min(340px,100vw)] overflow-y-auto overscroll-contain px-6 py-6">
       {/* Convert */}
       <section>
         <div className="flex items-center justify-between">
@@ -252,7 +274,7 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
         </div>
         <div className="mt-3 flex items-center gap-3">
           <span className="text-callout font-semibold uppercase">{item.ext || "—"}</span>
-          <ChevronRight size={16} strokeWidth={1.75} className="text-subtle" />
+          <ChevronRight aria-hidden size={16} strokeWidth={1.75} className="text-subtle" />
           <FormatSelect size="sm" options={options} value={item.target} onChange={(e) => setTarget(item.id, e)} disabled={busy} />
         </div>
         <div className="mt-4 flex gap-2">
@@ -262,7 +284,7 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
             </button>
           ) : (
             <button className="btn-secondary flex-1 !bg-fg !text-bg hover:!bg-fg/85" disabled={busy || !item.target} onClick={() => start([item.id])}>
-              {item.status === "ready" ? "Convert again" : "Convert"}
+              {item.status === "ready" ? "Convert Again" : "Convert"}
             </button>
           )}
           <button className="btn-secondary sm:hidden" onClick={onDownload}>
@@ -304,8 +326,8 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
           <Row k="Size" v={`${formatBytes(item.size)} (${item.size.toLocaleString()} bytes)`} />
           <Row k="Dimensions" v={item.width && item.height ? `${item.width} × ${item.height}` : undefined} />
           <Row k="Duration" v={item.duration ? formatDuration(item.duration) : undefined} />
-          <Row k="Modified" v={new Date(item.lastModified).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} />
-          <Row k="Added" v={new Date(item.addedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} />
+          <Row k="Modified" v={formatDateTime(item.lastModified)} />
+          <Row k="Added" v={formatDateTime(item.addedAt)} />
         </dl>
       </section>
 
@@ -323,17 +345,17 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
                 })
               }
             >
-              {copied ? <Check size={14} className="text-success" /> : <Copy size={14} strokeWidth={1.75} />}
+              {copied ? <Check aria-hidden size={14} className="text-success" /> : <Copy aria-hidden size={14} strokeWidth={1.75} />}
             </button>
           )}
         </div>
         <p className="break-all font-mono text-caption leading-5 text-muted">
-          {item.sha256 ?? (item.status === "uploading" ? "Calculating…" : "Not calculated (file too large)")}
+          {item.sha256 ?? (item.status === "uploading" ? "Calculating…" : "Not calculated: files over 256\u00A0MB are skipped.")}
         </p>
       </section>
 
       <button className="btn-text mt-10 -ml-3 text-danger hover:bg-danger/[0.06]" onClick={onRemove}>
-        Remove file
+        Remove File
       </button>
     </div>
   );

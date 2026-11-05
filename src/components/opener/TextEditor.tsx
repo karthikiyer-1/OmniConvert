@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { CaseSensitive, Search, WrapText } from "lucide-react";
-import { cn, formatBytes } from "@/lib/utils";
+import { cn, formatBytes, formatCount } from "@/lib/utils";
 import { mimeFor } from "@/lib/formats";
 import { useStore } from "@/lib/store";
-import type { OpenFile } from "@/lib/opener";
+import { useOpener, type OpenFile } from "@/lib/opener";
 import { download, editedName, saveToFiles } from "./actions";
 
 const MAX_EDIT = 5 * 1024 * 1024;
@@ -37,14 +37,21 @@ export function TextEditor({ file }: { file: OpenFile }) {
     };
   }, [file]);
 
+  // Counts run on a deferred copy so typing stays responsive in large files.
+  const lazyText = useDeferredValue(text);
   const re = useMemo(() => (find ? new RegExp(escapeRe(find), matchCase ? "g" : "gi") : null), [find, matchCase]);
-  const matches = useMemo(() => (re && text ? text.match(re)?.length ?? 0 : 0), [re, text]);
+  const matches = useMemo(() => (re && lazyText ? lazyText.match(re)?.length ?? 0 : 0), [re, lazyText]);
   const stats = useMemo(() => {
-    const t = text ?? "";
+    const t = lazyText ?? "";
     return { lines: t ? t.split("\n").length : 0, words: (t.match(/\S+/g) || []).length, chars: t.length };
-  }, [text]);
+  }, [lazyText]);
   const isJson = file.ext === "json";
   const dirty = text !== null && text !== original;
+  const setDirty = useOpener((s) => s.setDirty);
+  useEffect(() => {
+    setDirty(dirty);
+  }, [dirty, setDirty]);
+  useEffect(() => () => setDirty(false), [setDirty]);
 
   const findNext = () => {
     const el = area.current;
@@ -67,14 +74,14 @@ export function TextEditor({ file }: { file: OpenFile }) {
   const replaceAll = () => {
     if (!re || text === null || !matches) return;
     setText(text.replace(re, () => replace));
-    toast({ tone: "info", title: `Replaced ${matches} match${matches > 1 ? "es" : ""}` });
+    toast({ tone: "info", title: `Replaced ${formatCount(matches)} match${matches > 1 ? "es" : ""}` });
   };
 
   const formatJson = (indent: number) => {
     try {
       setText(JSON.stringify(JSON.parse(text ?? ""), null, indent || undefined));
     } catch (e) {
-      toast({ tone: "error", title: "Not valid JSON", body: (e as Error).message });
+      toast({ tone: "error", title: "This isn’t valid JSON yet", body: `${(e as Error).message}. Fix it, then format again.` });
     }
   };
 
@@ -82,36 +89,54 @@ export function TextEditor({ file }: { file: OpenFile }) {
   const outName = editedName(file.name, file.ext || "txt");
 
   if (text === null)
-    return <div className="flex h-full items-center justify-center text-footnote text-muted">Opening…</div>;
+    return (
+      <div className="flex h-full items-center justify-center text-footnote text-muted" role="status">
+        Opening…
+      </div>
+    );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-3" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
         <label className="flex h-9 min-w-[160px] flex-1 items-center gap-2 rounded-[10px] bg-fg/[0.05] px-3 text-footnote focus-within:ring-2 focus-within:ring-accent/40 sm:max-w-[240px]">
-          <Search size={14} strokeWidth={1.75} className="shrink-0 text-subtle" />
+          <Search aria-hidden size={14} strokeWidth={1.75} className="shrink-0 text-subtle" />
+          <span className="sr-only">Find</span>
           <input
+            type="search"
+            name="find"
+            autoComplete="off"
+            spellCheck={false}
             value={find}
             onChange={(e) => setFind(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), findNext())}
-            placeholder="Find"
+            placeholder="Find…"
             className="w-full min-w-0 bg-transparent outline-none placeholder:text-subtle"
           />
-          {find && <span className="shrink-0 tabular-nums text-subtle">{matches}</span>}
+          {find && (
+            <span className="shrink-0 tabular-nums text-subtle" aria-live="polite">
+              {formatCount(matches)}
+              <span className="sr-only"> matches</span>
+            </span>
+          )}
         </label>
         <label className="flex h-9 min-w-[140px] flex-1 items-center rounded-[10px] bg-fg/[0.05] px-3 text-footnote focus-within:ring-2 focus-within:ring-accent/40 sm:max-w-[200px]">
+          <span className="sr-only">Replace with</span>
           <input
+            name="replace"
+            autoComplete="off"
+            spellCheck={false}
             value={replace}
             onChange={(e) => setReplace(e.target.value)}
-            placeholder="Replace with"
+            placeholder="Replace with…"
             className="w-full min-w-0 bg-transparent outline-none placeholder:text-subtle"
           />
         </label>
         <button className="btn-secondary" disabled={!matches} onClick={replaceAll}>
-          Replace all
+          Replace All
         </button>
         <button className={cn("icon-btn", matchCase && "bg-fg/[0.06] text-fg")} onClick={() => setMatchCase((v) => !v)} aria-pressed={matchCase} aria-label="Match case" title="Match case">
-          <CaseSensitive size={18} strokeWidth={1.75} />
+          <CaseSensitive aria-hidden size={18} strokeWidth={1.75} />
         </button>
         <div className="flex-1" />
         {isJson && (
@@ -125,12 +150,12 @@ export function TextEditor({ file }: { file: OpenFile }) {
           </>
         )}
         <button className={cn("icon-btn", wrap && "bg-fg/[0.06] text-fg")} onClick={() => setWrap((v) => !v)} aria-pressed={wrap} aria-label="Wrap lines" title="Wrap lines">
-          <WrapText size={16} strokeWidth={1.75} />
+          <WrapText aria-hidden size={16} strokeWidth={1.75} />
         </button>
       </div>
 
       {/* Editor */}
-      <div className="flex min-h-0 flex-1 bg-surface">
+      <div className="flex min-h-0 flex-1 bg-surface focus-within:shadow-[inset_0_0_0_2px_rgb(var(--accent)/0.35)]">
         {!wrap && (
           <div ref={gutter} aria-hidden className="select-none overflow-hidden py-4 pl-4 pr-3 text-right font-mono text-[13px] leading-[22px] text-subtle/70">
             {Array.from({ length: stats.lines || 1 }, (_, i) => (
@@ -140,6 +165,8 @@ export function TextEditor({ file }: { file: OpenFile }) {
         )}
         <textarea
           ref={area}
+          name="content"
+          autoComplete="off"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onScroll={(e) => gutter.current && (gutter.current.scrollTop = e.currentTarget.scrollTop)}
@@ -155,8 +182,8 @@ export function TextEditor({ file }: { file: OpenFile }) {
 
       {/* Status + actions */}
       <div className="flex flex-wrap items-center gap-3 px-4 py-3" style={{ boxShadow: "0 -1px 0 var(--hairline)" }}>
-        <p className="text-caption text-muted">
-          {stats.lines.toLocaleString()} lines · {stats.words.toLocaleString()} words · {stats.chars.toLocaleString()} characters
+        <p className="text-caption tabular-nums text-muted">
+          {formatCount(stats.lines)} lines · {formatCount(stats.words)} words · {formatCount(stats.chars)} characters
           {tooBig && ` · editing the first ${formatBytes(MAX_EDIT)}`}
           {dirty && <span className="text-fg"> · Edited</span>}
         </p>

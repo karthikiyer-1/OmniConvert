@@ -41,7 +41,7 @@ export function AudioEditor({ file }: { file: OpenFile }) {
         const top = Math.max(...out, 0.01);
         setPeaks(out.map((p) => p / top));
       })
-      .catch(() => !cancelled && setError("This browser can't decode this audio for editing."));
+      .catch(() => !cancelled && setError("This browser can’t decode this audio. Convert it to WAV in the Convert tab, then open it here."));
     return () => {
       cancelled = true;
       URL.revokeObjectURL(u);
@@ -75,7 +75,9 @@ export function AudioEditor({ file }: { file: OpenFile }) {
   return (
     <div className="flex h-full flex-col items-center justify-center overflow-auto px-6 py-12 md:px-16">
       <div className="w-full max-w-[720px]">
-        <p className="truncate text-center font-display text-title font-semibold">{file.name.replace(/\.[^.]+$/, "")}</p>
+        <p className="truncate text-center font-display text-title font-semibold" translate="no">
+          {file.name.replace(/\.[^.]+$/, "")}
+        </p>
         <p className="mt-1 text-center text-footnote text-muted">Drag the handles to choose the part you want to keep.</p>
 
         {/* Waveform with selection */}
@@ -97,7 +99,8 @@ export function AudioEditor({ file }: { file: OpenFile }) {
             <>
               <input
                 type="range"
-                aria-label="Start"
+                aria-label="Selection start"
+                aria-valuetext={formatDuration(start)}
                 min={0}
                 max={dur}
                 step={0.01}
@@ -107,7 +110,8 @@ export function AudioEditor({ file }: { file: OpenFile }) {
               />
               <input
                 type="range"
-                aria-label="End"
+                aria-label="Selection end"
+                aria-valuetext={formatDuration(end)}
                 min={0}
                 max={dur}
                 step={0.01}
@@ -119,9 +123,9 @@ export function AudioEditor({ file }: { file: OpenFile }) {
           )}
         </div>
 
-        <div className="mt-6 flex items-center justify-between text-footnote tabular-nums text-muted">
+        <div className="mt-6 flex items-center justify-between text-footnote tabular-nums text-muted" aria-live="polite">
           <span>Start {formatDuration(start)}</span>
-          <span className="text-fg">{(end - start).toFixed(1)} s selected</span>
+          <span className="text-fg">{(end - start).toFixed(1)}\u00A0s selected</span>
           <span>End {formatDuration(end)}</span>
         </div>
 
@@ -131,7 +135,7 @@ export function AudioEditor({ file }: { file: OpenFile }) {
             onClick={togglePlay}
             aria-label={playing ? "Pause" : "Play selection"}
           >
-            {playing ? <Pause size={18} fill="currentColor" strokeWidth={0} /> : <Play size={18} fill="currentColor" strokeWidth={0} className="ml-0.5" />}
+            {playing ? <Pause aria-hidden size={18} fill="currentColor" strokeWidth={0} /> : <Play aria-hidden size={18} fill="currentColor" strokeWidth={0} className="ml-0.5" />}
           </button>
           <button className="btn-secondary h-11 px-5" disabled={!buffer} onClick={() => exportTrim("download")}>
             Download WAV
@@ -183,7 +187,7 @@ export function VideoEditor({ file }: { file: OpenFile }) {
         toast({ tone: "success", title: "Frame saved to Files", body: name });
       }
     } catch (e) {
-      toast({ tone: "error", title: "Couldn't capture frame", body: (e as Error).message });
+      toast({ tone: "error", title: "Couldn’t capture the frame", body: `${(e as Error).message}. Try a different moment.` });
     } finally {
       setBusy(false);
     }
@@ -192,10 +196,10 @@ export function VideoEditor({ file }: { file: OpenFile }) {
   return (
     <div className="flex h-full min-h-0 flex-col lg:flex-row">
       <div className="flex min-h-[320px] flex-1 items-center justify-center bg-black">
-        {url && <video ref={video} src={url} controls playsInline className="max-h-full max-w-full" />}
+        {url && <video ref={video} src={url} controls playsInline aria-label={file.name} className="max-h-full max-w-full" />}
       </div>
       <aside className="w-full shrink-0 bg-surface px-6 py-6 lg:w-[320px]" style={{ boxShadow: "-1px 0 0 var(--hairline)" }}>
-        <Section title="Capture frame">
+        <Section title="Capture Frame">
           <p className="mb-4 text-footnote text-muted">Pause on the frame you want, then save it as an image.</p>
           <Choice
             label="Image format"

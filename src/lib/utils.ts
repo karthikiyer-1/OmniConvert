@@ -6,13 +6,23 @@ export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }
 
+const NBSP = "\u00A0";
+const numberFmt = new Map<number, Intl.NumberFormat>();
+const fmtNumber = (v: number, digits: number) => {
+  if (!numberFmt.has(digits)) numberFmt.set(digits, new Intl.NumberFormat(undefined, { maximumFractionDigits: digits }));
+  return numberFmt.get(digits)!.format(v);
+};
+
+/** "1.2 MB" with a non-breaking space so the unit never wraps away. */
 export function formatBytes(bytes: number, digits = 1): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  if (!Number.isFinite(bytes) || bytes <= 0) return `0${NBSP}B`;
   const units = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const v = bytes / 1024 ** i;
-  return `${v.toFixed(i === 0 ? 0 : v < 10 ? digits : 0)} ${units[i]}`;
+  return `${fmtNumber(v, i === 0 ? 0 : v < 10 ? digits : 0)}${NBSP}${units[i]}`;
 }
+
+export const formatCount = (n: number) => fmtNumber(n, 0);
 
 export function formatDuration(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return "0:00";
@@ -23,13 +33,25 @@ export function formatDuration(sec: number): string {
   return h ? `${h}:${m.toString().padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
+const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto", style: "short" });
+const dayFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+
 export function timeAgo(ts: number): string {
   const d = (Date.now() - ts) / 1000;
-  if (d < 45) return "just now";
-  if (d < 3600) return `${Math.round(d / 60)}m ago`;
-  if (d < 86400) return `${Math.round(d / 3600)}h ago`;
-  return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (d < 45) return rtf.format(0, "second");
+  if (d < 3600) return rtf.format(-Math.round(d / 60), "minute");
+  if (d < 86400) return rtf.format(-Math.round(d / 3600), "hour");
+  return dayFmt.format(ts);
 }
+
+export const formatDateTime = (ts: number) =>
+  new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(ts);
+export const formatTime = (ts: number) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(ts);
+export const formatDay = (ts: number) => new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(ts);
+export const formatMonthYear = (ts: number) => new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(ts);
+
+/** Pointer is a mouse/trackpad — used to limit autofocus to desktop. */
+export const isFinePointer = () => typeof matchMedia !== "undefined" && matchMedia("(pointer: fine)").matches;
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

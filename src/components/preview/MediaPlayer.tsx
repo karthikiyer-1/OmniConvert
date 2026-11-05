@@ -101,7 +101,7 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
       const b = e.currentTarget.buffered;
       if (b.length) setBuffered(b.end(b.length - 1));
     },
-    onError: () => setError("This browser can't play this codec. Download the file to play it locally."),
+    onError: () => setError("This browser can’t play this format. Convert it to MP4 or WEBM, or download it to play locally."),
   };
 
   const VolIcon = muted || vol === 0 ? VolumeX : vol < 0.5 ? Volume1 : Volume2;
@@ -125,11 +125,12 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
           className={cn("slider relative w-full", dark && "on-dark")}
           style={{ ["--pct" as string]: `${pct}%` }}
           aria-label="Seek"
+          aria-valuetext={`${formatDuration(time)} of ${formatDuration(dur)}`}
         />
       </div>
       <div className="mt-2 flex items-center gap-1">
         <button className={cn("icon-btn", dark && "text-white/90 hover:bg-white/15 hover:text-white")} onClick={() => seek(time - 10)} title="Back 10s (J)">
-          <RotateCcw size={16} />
+          <RotateCcw aria-hidden size={16} />
         </button>
         <button
           className={cn(
@@ -139,10 +140,10 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
           onClick={toggle}
           aria-label={playing ? "Pause" : "Play"}
         >
-          {playing ? <Pause size={18} fill="currentColor" strokeWidth={0} /> : <Play size={18} fill="currentColor" strokeWidth={0} className="ml-0.5" />}
+          {playing ? <Pause aria-hidden size={18} fill="currentColor" strokeWidth={0} /> : <Play aria-hidden size={18} fill="currentColor" strokeWidth={0} className="ml-0.5" />}
         </button>
         <button className={cn("icon-btn", dark && "text-white/90 hover:bg-white/15 hover:text-white")} onClick={() => seek(time + 10)} title="Forward 10s (L)">
-          <RotateCw size={16} />
+          <RotateCw aria-hidden size={16} />
         </button>
         <span className={cn("ml-2 text-caption font-medium tabular-nums", dark ? "text-white/80" : "text-muted")}>
           {formatDuration(time)} / {formatDuration(dur)}
@@ -150,7 +151,7 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
         <div className="flex-1" />
         <div className="group/vol flex items-center">
           <button className={cn("icon-btn", dark && "text-white/90 hover:bg-white/15 hover:text-white")} onClick={() => setMuted((v) => !v)} title="Mute (M)">
-            <VolIcon size={17} />
+            <VolIcon aria-hidden size={17} />
           </button>
           <input
             type="range"
@@ -162,7 +163,7 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
               setVol(+e.target.value);
               setMuted(false);
             }}
-            className={cn("slider w-0 opacity-0 transition-all duration-300 group-hover/vol:w-20 group-hover/vol:opacity-100 max-sm:hidden", dark && "on-dark")}
+            className={cn("slider ml-1 w-20 max-sm:hidden", dark && "on-dark")}
             style={{ ["--pct" as string]: `${(muted ? 0 : vol) * 100}%` }}
             aria-label="Volume"
           />
@@ -179,7 +180,7 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
           onClick={() => setLoop((v) => !v)}
           title="Loop"
         >
-          <Repeat size={15} />
+          <Repeat aria-hidden size={15} />
         </button>
         {kind === "video" && (
           <>
@@ -189,11 +190,11 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
                 onClick={() => media.current?.requestPictureInPicture?.().catch(() => {})}
                 title="Picture in Picture"
               >
-                <PictureInPicture2 size={16} />
+                <PictureInPicture2 aria-hidden size={16} />
               </button>
             )}
             <button className="icon-btn text-white/90 hover:bg-white/15 hover:text-white" onClick={toggleFull} title="Fullscreen (F)">
-              {full ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {full ? <Minimize2 aria-hidden size={16} /> : <Maximize2 aria-hidden size={16} />}
             </button>
           </>
         )}
@@ -222,7 +223,7 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
               className="absolute flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.18] text-white backdrop-blur-[20px] transition-colors hover:bg-white/25"
               aria-label="Play"
             >
-              <Play size={26} fill="currentColor" strokeWidth={0} className="ml-1" />
+              <Play aria-hidden size={26} fill="currentColor" strokeWidth={0} className="ml-1" />
             </motion.button>
           )}
         </AnimatePresence>
@@ -242,7 +243,7 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
     <div className="flex h-full w-full items-center justify-center overflow-auto px-6 py-10 md:px-16">
       <div className="w-full max-w-[560px]">
         <div className="mx-auto mb-8 flex aspect-square w-40 items-center justify-center rounded-[28px] bg-fg/[0.05] text-muted md:w-48">
-          <Music2 size={56} strokeWidth={1.25} />
+          <Music2 aria-hidden size={56} strokeWidth={1.25} />
         </div>
         <p className="truncate text-center font-display text-title font-semibold">{name.replace(/\.[^.]+$/, "")}</p>
         <p className="mt-1 text-center text-footnote uppercase tracking-[0.06em] text-subtle">{name.split(".").pop()} audio</p>
@@ -304,7 +305,7 @@ function Waveform({ blob, progress, onSeek }: { blob?: Blob; progress: number; o
       {bars.map((p, i) => (
         <span
           key={i}
-          className={cn("flex-1 rounded-full transition-[background-color,height] duration-500 ease-apple", i / BARS < progress ? "bg-fg" : "bg-fg/[0.12]")}
+          className={cn("flex-1 rounded-full transition-colors duration-500 ease-apple", i / BARS < progress ? "bg-fg" : "bg-fg/[0.12]")}
           style={{ height: `${Math.max(6, p * 100)}%` }}
         />
       ))}

@@ -9,7 +9,7 @@
  */
 
 const subtle = () => {
-  if (!globalThis.crypto?.subtle) throw new Error("This browser doesn't support secure encryption (needs HTTPS).");
+  if (!globalThis.crypto?.subtle) throw new Error("This browser can’t encrypt data here. Open OmniConvert over HTTPS in an up-to-date browser.");
   return globalThis.crypto.subtle;
 };
 

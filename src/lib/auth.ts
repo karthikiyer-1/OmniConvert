@@ -27,8 +27,8 @@ import {
   wrapDataKey,
 } from "./crypto";
 import { deleteNamespace, getBlob, idbDelete, idbGet, idbPut, idbValues, putBlob, setVault } from "./db";
-import { flush, loadVault } from "./persistence";
-import { origKey, outKey, useStore } from "./store";
+import { flush, loadVault, sweepOrphans } from "./persistence";
+import { commitPendingDeletions, origKey, outKey, useStore } from "./store";
 import { uid } from "./utils";
 
 interface AccountRecord {
@@ -138,9 +138,12 @@ interface AuthState {
 }
 
 async function enterVault(prefix: string, key: CryptoKey | null) {
+  commitPendingDeletions();
   await flush();
   setVault({ prefix, key });
-  useStore.getState().hydrate(await loadVault());
+  const data = await loadVault();
+  useStore.getState().hydrate(data);
+  void sweepOrphans(data.items);
 }
 
 export const useAuth = create<AuthState>()((set, get) => ({
@@ -172,7 +175,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     if (!name) throw new Error("Enter your name.");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
     if (password.length < MIN_PASSWORD) throw new Error(`Use at least ${MIN_PASSWORD} characters.`);
-    if (await findAccount(email)) throw new Error("An account with this email already exists on this device.");
+    if (await findAccount(email)) throw new Error("An account with this email already exists on this device. Sign in instead.");
 
     const salt = randomBytes(16);
     const kek = await deriveKek(password, salt);
@@ -208,6 +211,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       carried = { items, history: guest.history, blobs };
     }
 
+    commitPendingDeletions();
     await flush();
     setVault({ prefix: prefixFor(acct.id), key });
     for (const [k, b] of carried.blobs) await putBlob(k, b);
@@ -231,7 +235,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     email = normEmail(email);
     const a = attempts.read(email);
     if (a.until > Date.now()) {
-      throw new Error(`Too many attempts. Try again in ${Math.ceil((a.until - Date.now()) / 1000)} seconds.`);
+      throw new Error(`Too many attempts. Wait ${Math.ceil((a.until - Date.now()) / 1000)} seconds, then try again.`);
     }
     const acct = await findAccount(email);
     // Same message for unknown email and wrong password; always pay the KDF cost.
@@ -246,7 +250,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       const n = a.n + 1;
       attempts.write(email, n >= MAX_ATTEMPTS ? { n: 0, until: Date.now() + LOCK_MS } : { n, until: 0 });
       throw new Error(
-        n >= MAX_ATTEMPTS ? "Too many attempts. Try again in 30 seconds." : "That email and password don't match an account on this device.",
+        n >= MAX_ATTEMPTS ? "Too many attempts. Wait 30 seconds, then try again." : "That email and password don’t match an account on this device. Check them and try again, or create an account.",
       );
     }
     attempts.clear(email);

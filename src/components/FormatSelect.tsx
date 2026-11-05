@@ -56,15 +56,32 @@ export function FormatSelect({
     const onDown = (e: MouseEvent) => {
       if (!menu.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOpen(false);
     };
+    // Move focus into the menu (selected option first), arrow keys to navigate.
+    const focusTimer = window.setTimeout(() => {
+      const opts = menu.current?.querySelectorAll<HTMLButtonElement>('[role="option"]');
+      const sel = menu.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]');
+      (sel ?? opts?.[0])?.focus({ preventScroll: false });
+    }, 20);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
+      if (e.key === "Escape" || e.key === "Tab") {
+        if (e.key === "Escape") e.stopPropagation();
         setOpen(false);
+        if (e.key === "Escape") btn.current?.focus();
+        return;
       }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+      const opts = [...(menu.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? [])];
+      if (!opts.length) return;
+      e.preventDefault();
+      const i = opts.indexOf(document.activeElement as HTMLButtonElement);
+      const next =
+        e.key === "Home" ? 0 : e.key === "End" ? opts.length - 1 : e.key === "ArrowDown" ? (i + 1) % opts.length : (i - 1 + opts.length) % opts.length;
+      opts[next].focus();
     };
     document.addEventListener("mousedown", onDown);
     window.addEventListener("keydown", onKey, true);
     return () => {
+      window.clearTimeout(focusTimer);
       document.removeEventListener("mousedown", onDown);
       window.removeEventListener("keydown", onKey, true);
     };
@@ -78,6 +95,7 @@ export function FormatSelect({
         disabled={disabled || !options.length}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={current ? `Convert to ${current.label}` : "Choose output format"}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
@@ -89,7 +107,7 @@ export function FormatSelect({
         )}
       >
         {current ? current.label : <span className="text-muted">{placeholder}</span>}
-        <ChevronDown size={size === "sm" ? 14 : 16} strokeWidth={2} className={cn("text-subtle transition-transform duration-400 ease-apple", open && "rotate-180")} />
+        <ChevronDown aria-hidden size={size === "sm" ? 14 : 16} strokeWidth={2} className={cn("text-subtle transition-transform duration-400 ease-apple", open && "rotate-180")} />
       </button>
       {createPortal(
         <AnimatePresence>
@@ -97,12 +115,13 @@ export function FormatSelect({
             <motion.div
               ref={menu}
               role="listbox"
+              aria-label="Output format"
               initial={{ opacity: 0, y: pos.up ? 4 : -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, transition: t.fast }}
               transition={t.base}
               style={{ top: pos.top, left: pos.left, width: MENU_W }}
-              className="scroll-thin fixed z-[80] max-h-[400px] overflow-auto rounded-2xl bg-elevated p-1.5 shadow-popover"
+              className="scroll-thin fixed z-[80] max-h-[400px] overflow-auto overscroll-contain rounded-2xl bg-elevated p-1.5 shadow-popover"
               onClick={(e) => e.stopPropagation()}
             >
               <p className="eyebrow px-3 pb-1.5 pt-2">Convert to</p>
@@ -116,10 +135,11 @@ export function FormatSelect({
                     onClick={() => {
                       onChange(o.ext);
                       setOpen(false);
+                      btn.current?.focus();
                     }}
-                    className="group flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left transition-colors duration-150 hover:bg-fg/[0.05]"
+                    className="group flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left transition-colors duration-150 hover:bg-fg/[0.05] focus-visible:bg-fg/[0.06] focus-visible:outline-offset-[-2px]"
                   >
-                    <span className="flex w-4 justify-center text-accent">{selected && <Check size={14} strokeWidth={2.5} />}</span>
+                    <span className="flex w-4 justify-center text-accent">{selected && <Check aria-hidden size={14} strokeWidth={2.5} />}</span>
                     <span className="text-body font-medium">{o.label}</span>
                     <span className="ml-auto truncate pl-2 text-caption text-subtle">{o.real ? o.hint ?? "" : "Simulated"}</span>
                   </button>

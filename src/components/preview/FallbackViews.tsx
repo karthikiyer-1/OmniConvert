@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ExternalLink, Folder, FileIcon as FileGlyph, Search } from "lucide-react";
 import { FileKind, KIND_LABEL } from "@/lib/formats";
-import { formatBytes } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 import { FileIcon } from "../FileIcon";
 
 /* --------------------------------------------------------------------- PDF */
@@ -10,20 +10,22 @@ import { FileIcon } from "../FileIcon";
 export function PdfViewer({ url }: { url: string }) {
   return (
     <div className="relative h-full w-full">
-      <iframe src={`${url}#view=FitH&toolbar=1`} title="PDF preview" className="h-full w-full border-0" />
+      <iframe src={`${url}#view=FitH&toolbar=1`} title="PDF document" className="h-full w-full border-0" />
       <a
         href={url}
         target="_blank"
         rel="noreferrer"
         className="material absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full px-4 py-2 text-footnote font-medium shadow-popover transition-opacity hover:opacity-80"
       >
-        <ExternalLink size={13} /> Open in new tab
+        <ExternalLink aria-hidden size={13} /> Open in new tab
       </a>
     </div>
   );
 }
 
 /* ----------------------------------------------------------------- Archive */
+
+const dateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
 interface Entry {
   path: string;
@@ -72,7 +74,7 @@ export function ArchiveViewer({ blob, name }: { blob: Blob; name: string }) {
 
   const shown = useMemo(() => entries?.filter((e) => e.path.toLowerCase().includes(q.toLowerCase())) ?? [], [entries, q]);
 
-  if (error) return <InfoCard kind="archive" name={name} blob={blob} message={`Couldn't read archive: ${error}`} />;
+  if (error) return <InfoCard kind="archive" name={name} blob={blob} message={`Couldn’t read this archive (${error}). It may be damaged or password-protected.`} />;
   if (!entries)
     return (
       <div className="flex h-full items-center justify-center">
@@ -96,9 +98,9 @@ export function ArchiveViewer({ blob, name }: { blob: Blob; name: string }) {
             {total > 0 && ` · ${Math.max(0, Math.round((1 - blob.size / total) * 100))}% compression`}
           </p>
         </div>
-        <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-[10px] bg-fg/[0.05] px-3 text-footnote sm:w-60">
-          <Search size={13} className="text-subtle" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter entries" className="w-full bg-transparent outline-none placeholder:text-subtle" />
+        <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-[10px] bg-fg/[0.05] px-3 text-footnote focus-within:ring-2 focus-within:ring-accent/50 sm:w-60">
+          <Search aria-hidden size={13} className="text-subtle" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter entries…" name="archive-filter" autoComplete="off" spellCheck={false} aria-label="Filter entries" className="w-full bg-transparent outline-none placeholder:text-subtle" />
         </label>
       </div>
       <div className="scroll-thin min-h-0 flex-1 overflow-auto px-3 py-3">
@@ -111,13 +113,13 @@ export function ArchiveViewer({ blob, name }: { blob: Blob; name: string }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: Math.min(i, 30) * 0.01 }}
-              className="flex items-center gap-3 rounded-xl px-3 py-2 text-footnote transition-colors hover:bg-fg/[0.035]"
+              className="cv-row flex items-center gap-3 rounded-xl px-3 py-2 text-footnote transition-colors hover:bg-fg/[0.035]"
               style={{ paddingLeft: 12 + depth * 20 }}
             >
-              {e.dir ? <Folder size={15} strokeWidth={1.5} className="shrink-0 text-muted" /> : <FileGlyph size={15} strokeWidth={1.5} className="shrink-0 text-subtle" />}
-              <span className={e.dir ? "font-medium" : ""}>{base}</span>
+              {e.dir ? <Folder aria-hidden size={15} strokeWidth={1.5} className="shrink-0 text-muted" /> : <FileGlyph aria-hidden size={15} strokeWidth={1.5} className="shrink-0 text-subtle" />}
+              <span className={cn("min-w-0 truncate", e.dir && "font-medium")} translate="no">{base}</span>
               <span className="ml-auto shrink-0 tabular-nums text-muted">{e.dir ? "—" : formatBytes(e.size ?? 0)}</span>
-              <span className="hidden w-24 shrink-0 text-right text-caption text-subtle sm:block">{e.date.toLocaleDateString()}</span>
+              <span className="hidden w-24 shrink-0 text-right text-caption text-subtle sm:block">{dateFmt.format(e.date)}</span>
             </motion.div>
           );
         })}
@@ -168,9 +170,9 @@ export function InfoCard({ kind, name, blob, message }: { kind: FileKind; name: 
     <div className="scroll-thin flex h-full w-full flex-col items-center overflow-auto px-6 py-16">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col items-center">
         <FileIcon kind={kind} size={96} />
-        <p className="mt-8 max-w-md break-all text-center font-display text-title font-semibold">{name}</p>
+        <p className="mt-8 max-w-md break-all text-center font-display text-title font-semibold" translate="no">{name}</p>
         <p className="mt-2 max-w-sm text-center text-body text-muted">
-          {message ?? `There's no preview for this ${KIND_LABEL[kind].toLowerCase()} type, but here's what's inside.`}
+          {message ?? `There’s no preview for this ${KIND_LABEL[kind].toLowerCase()} type, but here’s what’s inside.`}
         </p>
         {magic && <p className="mt-4 text-footnote text-subtle">Detected: {magic}</p>}
       </motion.div>

@@ -3,7 +3,7 @@
  *  - Guest: plain JSON in localStorage (same key/format as earlier versions).
  *  - Account: AES-GCM sealed JSON in IndexedDB, under the account's prefix.
  */
-import { getVault, idbGet, idbPut, type Vault } from "./db";
+import { getVault, idbDelete, idbGet, idbKeys, idbPut, type Vault } from "./db";
 import { isSealed, openJSON, sealJSON } from "./crypto";
 import { useStore, type FileItem, type HistoryEvent } from "./store";
 
@@ -68,4 +68,24 @@ export function startAutosave() {
     window.clearTimeout(timer);
     timer = window.setTimeout(flush, 400);
   });
+}
+
+/**
+ * Delete stored files no longer referenced by the file list (e.g. the page
+ * closed during an undo window). Runs in the background after loading.
+ */
+export async function sweepOrphans(items: FileItem[], v: Vault = getVault()) {
+  try {
+    const live = new Set(items.map((i) => i.id));
+    const keys = (await idbKeys("blobs")).filter((k): k is string => typeof k === "string");
+    const mine = keys.filter((k) => (v.prefix ? k.startsWith(v.prefix) : !k.startsWith("u:")));
+    await Promise.all(
+      mine
+        .map((k) => [k, /(?:orig|out):(.+)$/.exec(k.slice(v.prefix.length))?.[1]] as const)
+        .filter(([, id]) => id && !live.has(id))
+        .map(([k]) => idbDelete("blobs", k)),
+    );
+  } catch {
+    /* best effort */
+  }
 }

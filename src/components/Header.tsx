@@ -3,19 +3,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Command, Moon, Sun } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { navigate, useRoute, type Route } from "@/lib/router";
+import { hrefFor, useRoute, type Route } from "@/lib/router";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/utils";
 import { t } from "@/lib/motion";
 import { Logo } from "./Logo";
 
 const SHORTCUTS: [string, string][] = [
-  ["Paste files", "⌘ V"],
-  ["Choose files", "⌘ O"],
-  ["Convert", "⌘ ↵"],
+  ["Paste files", "⌘\u00A0V"],
+  ["Choose files", "⌘\u00A0O"],
+  ["Convert", "⌘\u00A0↵"],
   ["Close preview", "Esc"],
-  ["Previous / next", "← →"],
-  ["Zoom", "+ −"],
+  ["Previous / next", "←\u00A0→"],
+  ["Zoom", "+\u00A0−"],
   ["Play / pause", "Space"],
 ];
 
@@ -39,40 +39,48 @@ export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onTo
   useEffect(() => {
     if (!showKeys) return;
     const close = (e: MouseEvent) => !keysRef.current?.contains(e.target as Node) && setShowKeys(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setShowKeys(false);
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [showKeys]);
 
   const status = converting
     ? `Converting ${converting}${queued ? ` · ${queued} waiting` : ""}`
     : uploading
-      ? `Adding ${uploading} file${uploading > 1 ? "s" : ""}`
+      ? `Adding ${uploading} file${uploading > 1 ? "s" : ""}…`
       : items.length
         ? `${items.length} file${items.length > 1 ? "s" : ""} · ${formatBytes(total)}`
         : "Ready";
   const busy = converting + uploading > 0;
 
   return (
-    <header className="material sticky top-0 z-40" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
-      <div className="mx-auto flex h-[52px] max-w-[1200px] items-center gap-4 px-6 md:px-10">
-        <a href="#/" className="flex items-center gap-2.5" aria-label="OmniConvert home">
+    <header
+      className="material sticky top-0 z-40"
+      style={{ boxShadow: "0 1px 0 var(--hairline)", paddingTop: "env(safe-area-inset-top)" }}
+    >
+      <div className="safe-x mx-auto flex h-[52px] max-w-[1200px] items-center gap-4 md:!px-10">
+        <a href="#/" className="flex items-center gap-2.5 rounded-lg" aria-label="OmniConvert home" translate="no">
           <Logo size={22} />
           <span className="font-display text-[17px] font-semibold tracking-[-0.02em] max-sm:hidden">OmniConvert</span>
         </a>
 
         <nav className="ml-2 flex items-center gap-1 md:ml-6" aria-label="Sections">
           {NAV.map(([r, label]) => (
-            <button
+            <a
               key={r}
-              onClick={() => navigate(r)}
+              href={hrefFor(r)}
               aria-current={route === r ? "page" : undefined}
               className={cn(
                 "rounded-full px-3 py-1.5 text-footnote transition-colors duration-200",
-                route === r ? "font-medium text-fg" : "text-muted hover:text-fg",
+                route === r ? "bg-fg/[0.06] font-medium text-fg" : "text-muted hover:bg-fg/[0.04] hover:text-fg",
               )}
             >
               {label}
-            </button>
+            </a>
           ))}
         </nav>
 
@@ -85,7 +93,8 @@ export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onTo
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={t.fast}
-            className="hidden items-center gap-2 text-footnote text-muted sm:flex"
+            className="hidden items-center gap-2 text-footnote tabular-nums text-muted sm:flex"
+            role="status"
             aria-live="polite"
           >
             {busy && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
@@ -95,7 +104,7 @@ export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onTo
 
         <div ref={keysRef} className="relative hidden md:block">
           <button className="icon-btn" onClick={() => setShowKeys((v) => !v)} aria-label="Keyboard shortcuts" aria-expanded={showKeys}>
-            <Command size={16} strokeWidth={1.75} />
+            <Command aria-hidden size={16} strokeWidth={1.75} />
           </button>
           <AnimatePresence>
             {showKeys && (
@@ -104,7 +113,9 @@ export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onTo
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4, transition: t.fast }}
                 transition={t.base}
-                className="absolute right-0 top-12 w-64 rounded-2xl bg-elevated p-2 shadow-popover"
+                className="absolute right-0 top-12 w-64 origin-top-right rounded-2xl bg-elevated p-2 shadow-popover"
+                role="dialog"
+                aria-label="Keyboard shortcuts"
               >
                 <p className="eyebrow px-3 pb-1 pt-2">Keyboard</p>
                 {SHORTCUTS.map(([label, key]) => (
@@ -128,16 +139,16 @@ export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onTo
               transition={t.fast}
               className="flex"
             >
-              {theme === "dark" ? <Moon size={16} strokeWidth={1.75} /> : <Sun size={16} strokeWidth={1.75} />}
+              {theme === "dark" ? <Moon aria-hidden size={16} strokeWidth={1.75} /> : <Sun aria-hidden size={16} strokeWidth={1.75} />}
             </motion.span>
           </AnimatePresence>
         </button>
 
         {authStatus !== "loading" &&
           (user ? (
-            <button
-              onClick={() => navigate("account")}
-              aria-label="Account"
+            <a
+              href={hrefFor("account")}
+              aria-label={`Account: ${user.name}`}
               title={user.email}
               className={cn(
                 "-mr-1 flex h-8 w-8 items-center justify-center rounded-full bg-fg text-[13px] font-semibold text-bg transition duration-200 ease-apple hover:bg-fg/85 active:scale-95",
@@ -145,11 +156,11 @@ export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onTo
               )}
             >
               {user.name.slice(0, 1).toUpperCase()}
-            </button>
+            </a>
           ) : (
-            <button className="btn-secondary -mr-1 h-8 px-3.5" onClick={() => navigate("account")}>
-              Sign in
-            </button>
+            <a className="btn-secondary -mr-1 h-8 px-3.5" href={hrefFor("account")}>
+              Sign In
+            </a>
           ))}
       </div>
     </header>

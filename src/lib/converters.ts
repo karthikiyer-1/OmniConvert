@@ -343,7 +343,7 @@ export async function captureFrame(blob: Blob, time: number, type: "png" | "jpg"
     video.src = url;
     await new Promise<void>((res, rej) => {
       video.onloadedmetadata = () => res();
-      video.onerror = () => rej(new Error("This browser can't decode this video"));
+      video.onerror = () => rej(new Error("This browser can’t decode this video"));
     });
     video.currentTime = Math.max(0, Math.min(time, (video.duration || 0) - 0.01));
     await new Promise<void>((res) => (video.onseeked = () => res()));
