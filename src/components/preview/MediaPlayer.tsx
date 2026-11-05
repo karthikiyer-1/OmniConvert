@@ -15,6 +15,7 @@ import {
   Music2,
 } from "lucide-react";
 import { cn, formatDuration } from "@/lib/utils";
+import { t } from "@/lib/motion";
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
@@ -126,25 +127,24 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
           aria-label="Seek"
         />
       </div>
-      <div className="mt-1.5 flex items-center gap-1">
+      <div className="mt-2 flex items-center gap-1">
         <button className={cn("icon-btn", dark && "text-white/90 hover:bg-white/15 hover:text-white")} onClick={() => seek(time - 10)} title="Back 10s (J)">
           <RotateCcw size={16} />
         </button>
-        <motion.button
-          whileTap={{ scale: 0.88 }}
+        <button
           className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-full transition",
-            dark ? "bg-white text-black hover:bg-white/90" : "bg-fg text-bg hover:opacity-90",
+            "flex h-11 w-11 items-center justify-center rounded-full transition duration-200 ease-apple active:scale-95",
+            dark ? "bg-white text-black hover:bg-white/85" : "bg-fg text-bg hover:bg-fg/85",
           )}
           onClick={toggle}
-          title="Play/Pause (Space)"
+          aria-label={playing ? "Pause" : "Play"}
         >
-          {playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
-        </motion.button>
+          {playing ? <Pause size={18} fill="currentColor" strokeWidth={0} /> : <Play size={18} fill="currentColor" strokeWidth={0} className="ml-0.5" />}
+        </button>
         <button className={cn("icon-btn", dark && "text-white/90 hover:bg-white/15 hover:text-white")} onClick={() => seek(time + 10)} title="Forward 10s (L)">
           <RotateCw size={16} />
         </button>
-        <span className={cn("ml-2 text-[12px] font-medium tabular-nums", dark ? "text-white/80" : "text-muted")}>
+        <span className={cn("ml-2 text-caption font-medium tabular-nums", dark ? "text-white/80" : "text-muted")}>
           {formatDuration(time)} / {formatDuration(dur)}
         </span>
         <div className="flex-1" />
@@ -168,14 +168,14 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
           />
         </div>
         <button
-          className={cn("h-8 min-w-[42px] rounded-lg px-1.5 text-[12px] font-semibold tabular-nums transition", dark ? "text-white/90 hover:bg-white/15" : "text-muted hover:bg-fg/[0.07] hover:text-fg")}
+          className={cn("h-9 min-w-[44px] rounded-full px-2 text-caption font-semibold tabular-nums transition duration-200", dark ? "text-white/90 hover:bg-white/15" : "text-muted hover:bg-fg/[0.07] hover:text-fg")}
           onClick={() => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])}
           title="Playback speed"
         >
           {speed}×
         </button>
         <button
-          className={cn("icon-btn", dark && "text-white/90 hover:bg-white/15 hover:text-white", loop && (dark ? "!text-white bg-white/20" : "!text-accent bg-accent/10"))}
+          className={cn("icon-btn", dark && "text-white/90 hover:bg-white/15 hover:text-white", loop && (dark ? "!text-white bg-white/20" : "!text-fg bg-fg/[0.08]"))}
           onClick={() => setLoop((v) => !v)}
           title="Loop"
         >
@@ -214,23 +214,23 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
         <AnimatePresence>
           {!playing && !error && (
             <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.2 }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              exit={{ opacity: 0, scale: 1.04 }}
+              transition={t.base}
               onClick={toggle}
-              className="absolute flex h-20 w-20 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-xl"
+              className="absolute flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.18] text-white backdrop-blur-[20px] transition-colors hover:bg-white/25"
               aria-label="Play"
             >
-              <Play size={34} fill="currentColor" className="ml-1" />
+              <Play size={26} fill="currentColor" strokeWidth={0} className="ml-1" />
             </motion.button>
           )}
         </AnimatePresence>
-        {error && <p className="absolute max-w-sm rounded-2xl bg-black/60 px-5 py-4 text-center text-[13px] text-white backdrop-blur">{error}</p>}
+        {error && <p className="absolute max-w-sm px-6 text-center text-footnote text-white/80">{error}</p>}
         <motion.div
           animate={{ opacity: idle && playing ? 0 : 1, y: idle && playing ? 10 : 0 }}
-          transition={{ duration: 0.25 }}
-          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent px-4 pb-3 pt-14 sm:px-6"
+          transition={t.base}
+          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-5 pb-4 pt-16 md:px-8"
         >
           {controls}
         </motion.div>
@@ -239,34 +239,18 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
   }
 
   return (
-    <div className="flex h-full w-full items-center justify-center overflow-auto p-4 sm:p-8">
-      <div className="w-full max-w-xl">
-        <div className="relative mx-auto mb-6 aspect-square w-48 overflow-hidden rounded-[28px] shadow-float sm:w-56">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#BF5AF2] via-[#5E5CE6] to-[#0A84FF]" />
-          <motion.div
-            className="absolute -inset-10 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,.35),transparent_45%)]"
-            animate={playing ? { rotate: 360 } : { rotate: 0 }}
-            transition={playing ? { duration: 12, repeat: Infinity, ease: "linear" } : { duration: 0.6 }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Music2 size={64} className="text-white/90" strokeWidth={1.4} />
-          </div>
-          <div className="absolute inset-x-0 bottom-4 flex h-8 items-end justify-center gap-[3px]">
-            {Array.from({ length: 18 }).map((_, i) => (
-              <motion.span
-                key={i}
-                className="w-[3px] rounded-full bg-white/80"
-                animate={playing ? { height: [6, 10 + ((i * 37) % 22), 6] } : { height: 4 }}
-                transition={{ duration: 0.6 + (i % 5) * 0.12, repeat: playing ? Infinity : 0, ease: "easeInOut" }}
-              />
-            ))}
-          </div>
+    <div className="flex h-full w-full items-center justify-center overflow-auto px-6 py-10 md:px-16">
+      <div className="w-full max-w-[560px]">
+        <div className="mx-auto mb-8 flex aspect-square w-40 items-center justify-center rounded-[28px] bg-fg/[0.05] text-muted md:w-48">
+          <Music2 size={56} strokeWidth={1.25} />
         </div>
-        <p className="truncate text-center text-[17px] font-semibold tracking-[-0.01em]">{name.replace(/\.[^.]+$/, "")}</p>
-        <p className="mb-5 text-center text-[12.5px] uppercase tracking-wider text-muted">{name.split(".").pop()} audio</p>
-        <Waveform blob={blob} progress={dur ? time / dur : 0} onSeek={(f) => seek(f * dur)} />
-        <div className="glass mt-4 rounded-2xl px-4 py-3">{controls}</div>
-        {error && <p className="mt-3 text-center text-[12.5px] text-danger">{error}</p>}
+        <p className="truncate text-center font-display text-title font-semibold">{name.replace(/\.[^.]+$/, "")}</p>
+        <p className="mt-1 text-center text-footnote uppercase tracking-[0.06em] text-subtle">{name.split(".").pop()} audio</p>
+        <div className="mt-10">
+          <Waveform blob={blob} progress={dur ? time / dur : 0} onSeek={(f) => seek(f * dur)} />
+        </div>
+        <div className="mt-6">{controls}</div>
+        {error && <p className="mt-4 text-center text-footnote text-danger">{error}</p>}
         <audio ref={media} src={url} preload="metadata" {...events} />
       </div>
     </div>
@@ -318,12 +302,9 @@ function Waveform({ blob, progress, onSeek }: { blob?: Blob; progress: number; o
       title="Click to seek"
     >
       {bars.map((p, i) => (
-        <motion.span
+        <span
           key={i}
-          initial={{ scaleY: 0.1 }}
-          animate={{ scaleY: 1 }}
-          transition={{ delay: i * 0.004, type: "spring", stiffness: 300, damping: 20 }}
-          className={cn("flex-1 rounded-full transition-colors", i / BARS < progress ? "bg-accent" : "bg-fg/15")}
+          className={cn("flex-1 rounded-full transition-[background-color,height] duration-500 ease-apple", i / BARS < progress ? "bg-fg" : "bg-fg/[0.12]")}
           style={{ height: `${Math.max(6, p * 100)}%` }}
         />
       ))}

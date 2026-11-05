@@ -1,25 +1,12 @@
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-export function ProgressBar({
-  value,
-  tone = "accent",
-  active = true,
-  className,
-}: {
-  value: number;
-  tone?: "accent" | "success" | "danger";
-  active?: boolean;
-  className?: string;
-}) {
-  const color = tone === "success" ? "bg-success" : tone === "danger" ? "bg-danger" : "bg-accent";
+/** 3px track, accent fill, eased width. */
+export function ProgressBar({ value, className, muted }: { value: number; className?: string; muted?: boolean }) {
   return (
-    <div className={cn("h-[5px] w-full overflow-hidden rounded-full bg-fg/[0.08]", className)}>
-      <motion.div
-        className={cn("relative h-full overflow-hidden rounded-full", color, active && "shimmer")}
-        initial={false}
-        animate={{ width: `${Math.max(2, Math.min(100, value))}%` }}
-        transition={{ type: "spring", stiffness: 120, damping: 22, mass: 0.6 }}
+    <div className={cn("h-[3px] w-full overflow-hidden rounded-full bg-fg/[0.08]", className)}>
+      <div
+        className={cn("h-full rounded-full transition-[width] duration-500 ease-apple", muted ? "bg-fg/20" : "bg-accent")}
+        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>
   );

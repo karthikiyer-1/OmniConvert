@@ -243,7 +243,7 @@ async function toWav(blob: Blob): Promise<Blob> {
   }
 }
 
-function encodeWav(audio: AudioBuffer): Blob {
+export function encodeWav(audio: AudioBuffer): Blob {
   const ch = Math.min(audio.numberOfChannels, 2);
   const rate = audio.sampleRate;
   const len = audio.length;
@@ -295,6 +295,63 @@ async function posterFrame(blob: Blob, target: string): Promise<Blob> {
     c.height = video.videoHeight;
     c.getContext("2d")!.drawImage(video, 0, 0);
     return toBlob(c, target === "png" ? "image/png" : "image/jpeg", 0.92);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Decode any browser-playable audio (or a video's audio track). */
+export async function decodeAudio(blob: Blob): Promise<AudioBuffer> {
+  const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const ctx = new Ctx();
+  try {
+    return await ctx.decodeAudioData(await blob.arrayBuffer());
+  } finally {
+    ctx.close();
+  }
+}
+
+/** Cut [start, end) seconds out of a decoded buffer, with short fades to avoid clicks. */
+export function trimAudio(audio: AudioBuffer, start: number, end: number, fadeMs = 8): Blob {
+  const rate = audio.sampleRate;
+  const a = Math.max(0, Math.floor(start * rate));
+  const b = Math.min(audio.length, Math.ceil(end * rate));
+  const len = Math.max(1, b - a);
+  const out = new AudioBuffer({ length: len, numberOfChannels: audio.numberOfChannels, sampleRate: rate });
+  const fade = Math.min(Math.floor((fadeMs / 1000) * rate), Math.floor(len / 2));
+  for (let c = 0; c < audio.numberOfChannels; c++) {
+    const src = audio.getChannelData(c).subarray(a, b);
+    const dst = out.getChannelData(c);
+    dst.set(src);
+    for (let i = 0; i < fade; i++) {
+      const g = i / fade;
+      dst[i] *= g;
+      dst[len - 1 - i] *= g;
+    }
+  }
+  return encodeWav(out);
+}
+
+/** Grab a single video frame at `time` seconds. */
+export async function captureFrame(blob: Blob, time: number, type: "png" | "jpg" = "png"): Promise<Blob> {
+  const url = URL.createObjectURL(blob);
+  try {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.src = url;
+    await new Promise<void>((res, rej) => {
+      video.onloadedmetadata = () => res();
+      video.onerror = () => rej(new Error("This browser can't decode this video"));
+    });
+    video.currentTime = Math.max(0, Math.min(time, (video.duration || 0) - 0.01));
+    await new Promise<void>((res) => (video.onseeked = () => res()));
+    const c = document.createElement("canvas");
+    c.width = video.videoWidth;
+    c.height = video.videoHeight;
+    c.getContext("2d")!.drawImage(video, 0, 0);
+    return toBlob(c, type === "png" ? "image/png" : "image/jpeg", 0.92);
   } finally {
     URL.revokeObjectURL(url);
   }

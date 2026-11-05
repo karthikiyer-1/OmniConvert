@@ -290,21 +290,6 @@ export const KIND_LABEL: Record<FileKind, string> = {
   other: "File",
 };
 
-/** Kind-coloured accent (Apple system palette). */
-export const KIND_COLOR: Record<FileKind, string> = {
-  image: "#FF9F0A",
-  video: "#FF375F",
-  audio: "#BF5AF2",
-  pdf: "#FF453A",
-  document: "#0A84FF",
-  spreadsheet: "#30D158",
-  text: "#8E8E93",
-  code: "#5E5CE6",
-  archive: "#AC8E68",
-  font: "#64D2FF",
-  other: "#98989D",
-};
-
 const HLJS_LANG: Record<string, string> = {
   js: "javascript",
   mjs: "javascript",

@@ -9,13 +9,13 @@ import { FileIcon } from "../FileIcon";
 
 export function PdfViewer({ url }: { url: string }) {
   return (
-    <div className="relative h-full w-full bg-fg/[0.04]">
+    <div className="relative h-full w-full">
       <iframe src={`${url}#view=FitH&toolbar=1`} title="PDF preview" className="h-full w-full border-0" />
       <a
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="glass-strong absolute bottom-4 right-4 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium shadow-float hover:text-accent"
+        className="material absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full px-4 py-2 text-footnote font-medium shadow-popover transition-opacity hover:opacity-80"
       >
         <ExternalLink size={13} /> Open in new tab
       </a>
@@ -85,39 +85,39 @@ export function ArchiveViewer({ blob, name }: { blob: Blob; name: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center gap-3 border-b hairline px-4 py-2.5">
-        <FileIcon kind="archive" size={32} />
+      <div className="flex flex-wrap items-center gap-4 px-6 py-4" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
+        <FileIcon kind="archive" size={40} />
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold">
+          <p className="text-body font-semibold">
             {files.length} {files.length === 1 ? "file" : "files"} · {entries.length - files.length} {entries.length - files.length === 1 ? "folder" : "folders"}
           </p>
-          <p className="text-[11.5px] text-muted">
+          <p className="text-footnote text-muted">
             {formatBytes(total)} uncompressed · {formatBytes(blob.size)} packed
             {total > 0 && ` · ${Math.max(0, Math.round((1 - blob.size / total) * 100))}% compression`}
           </p>
         </div>
-        <label className="ml-auto flex w-full items-center gap-2 rounded-[10px] bg-fg/[0.05] px-2.5 py-1.5 text-[12.5px] sm:w-56">
+        <label className="ml-auto flex h-9 w-full items-center gap-2 rounded-[10px] bg-fg/[0.05] px-3 text-footnote sm:w-60">
           <Search size={13} className="text-subtle" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter entries" className="w-full bg-transparent outline-none placeholder:text-subtle" />
         </label>
       </div>
-      <div className="scroll-thin min-h-0 flex-1 overflow-auto p-2">
+      <div className="scroll-thin min-h-0 flex-1 overflow-auto px-3 py-3">
         {shown.slice(0, 3000).map((e, i) => {
           const depth = e.path.replace(/\/$/, "").split("/").length - 1;
           const base = e.path.replace(/\/$/, "").split("/").pop();
           return (
             <motion.div
               key={e.path}
-              initial={{ opacity: 0, x: -6 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: Math.min(i, 40) * 0.008 }}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12.5px] hover:bg-fg/[0.04]"
-              style={{ paddingLeft: 8 + depth * 16 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: Math.min(i, 30) * 0.01 }}
+              className="flex items-center gap-3 rounded-xl px-3 py-2 text-footnote transition-colors hover:bg-fg/[0.035]"
+              style={{ paddingLeft: 12 + depth * 20 }}
             >
-              {e.dir ? <Folder size={14} className="shrink-0 text-accent" fill="currentColor" fillOpacity={0.2} /> : <FileGlyph size={14} className="shrink-0 text-subtle" />}
+              {e.dir ? <Folder size={15} strokeWidth={1.5} className="shrink-0 text-muted" /> : <FileGlyph size={15} strokeWidth={1.5} className="shrink-0 text-subtle" />}
               <span className={e.dir ? "font-medium" : ""}>{base}</span>
               <span className="ml-auto shrink-0 tabular-nums text-muted">{e.dir ? "—" : formatBytes(e.size ?? 0)}</span>
-              <span className="hidden w-24 shrink-0 text-right text-[11px] text-subtle sm:block">{e.date.toLocaleDateString()}</span>
+              <span className="hidden w-24 shrink-0 text-right text-caption text-subtle sm:block">{e.date.toLocaleDateString()}</span>
             </motion.div>
           );
         })}
@@ -165,27 +165,25 @@ export function InfoCard({ kind, name, blob, message }: { kind: FileKind; name: 
   if (!magic && hex.slice(8, 16) === "66747970") magic = "ISO-BMFF (MP4/MOV/HEIC/M4A)";
 
   return (
-    <div className="scroll-thin flex h-full w-full flex-col items-center overflow-auto px-5 py-10">
-      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 20 }}>
-        <FileIcon kind={kind} ext={name.split(".").pop()} size={88} className="!rounded-[24px]" />
+    <div className="scroll-thin flex h-full w-full flex-col items-center overflow-auto px-6 py-16">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="flex flex-col items-center">
+        <FileIcon kind={kind} size={96} />
+        <p className="mt-8 max-w-md break-all text-center font-display text-title font-semibold">{name}</p>
+        <p className="mt-2 max-w-sm text-center text-body text-muted">
+          {message ?? `There's no preview for this ${KIND_LABEL[kind].toLowerCase()} type, but here's what's inside.`}
+        </p>
+        {magic && <p className="mt-4 text-footnote text-subtle">Detected: {magic}</p>}
       </motion.div>
-      <p className="mt-5 max-w-md break-all text-center text-[17px] font-semibold tracking-[-0.01em]">{name}</p>
-      <p className="mt-1 text-center text-[13px] text-muted">
-        {message ?? `Quick Look isn't available for this ${KIND_LABEL[kind].toLowerCase()} type — here's what we know about it.`}
-      </p>
-      {magic && (
-        <span className="chip mt-3 bg-success/12 text-success">Signature: {magic}</span>
-      )}
       {bytes && (
-        <div className="glass mt-6 w-full max-w-xl overflow-hidden rounded-2xl">
-          <p className="border-b hairline px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-subtle">Header bytes</p>
-          <div className="scroll-thin overflow-x-auto p-4 font-mono text-[11.5px] leading-[1.7]">
+        <div className="mt-12 w-full max-w-xl">
+          <p className="eyebrow mb-3">First 256 bytes</p>
+          <div className="scroll-thin overflow-x-auto rounded-2xl bg-fg/[0.03] p-5 font-mono text-caption leading-6">
             {Array.from({ length: Math.ceil(bytes.length / 16) }).map((_, row) => {
               const slice = [...bytes.slice(row * 16, row * 16 + 16)];
               return (
-                <div key={row} className="flex gap-4 whitespace-pre">
+                <div key={row} className="flex gap-5 whitespace-pre">
                   <span className="text-subtle">{(row * 16).toString(16).padStart(6, "0")}</span>
-                  <span className="text-fg/85">{slice.map((b) => b.toString(16).padStart(2, "0")).join(" ").padEnd(47)}</span>
+                  <span>{slice.map((b) => b.toString(16).padStart(2, "0")).join(" ").padEnd(47)}</span>
                   <span className="text-muted">{slice.map((b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : "·")).join("")}</span>
                 </div>
               );

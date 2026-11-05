@@ -1,16 +1,5 @@
-import {
-  Archive,
-  File,
-  FileAudio,
-  FileCode2,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  FileType2,
-  FileVideo,
-  Type,
-} from "lucide-react";
-import { FileKind, KIND_COLOR } from "@/lib/formats";
+import { Archive, File, FileAudio, FileCode2, FileImage, FileSpreadsheet, FileText, FileType2, FileVideo, Type } from "lucide-react";
+import type { FileKind } from "@/lib/formats";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<FileKind, typeof File> = {
@@ -27,38 +16,15 @@ const ICONS: Record<FileKind, typeof File> = {
   other: File,
 };
 
-export function FileIcon({
-  kind,
-  ext,
-  size = 40,
-  className,
-}: {
-  kind: FileKind;
-  ext?: string;
-  size?: number;
-  className?: string;
-}) {
+/** Neutral tile + glyph. Type is communicated by shape, not colour. */
+export function FileIcon({ kind, size = 44, className }: { kind: FileKind; size?: number; className?: string }) {
   const Icon = ICONS[kind];
-  const color = KIND_COLOR[kind];
   return (
     <div
-      className={cn("relative flex shrink-0 items-center justify-center rounded-[11px]", className)}
-      style={{
-        width: size,
-        height: size,
-        background: `linear-gradient(145deg, ${color}26, ${color}14)`,
-        boxShadow: `inset 0 0 0 0.5px ${color}40`,
-      }}
+      className={cn("flex shrink-0 items-center justify-center bg-fg/[0.05] text-muted", className)}
+      style={{ width: size, height: size, borderRadius: Math.round(size * 0.27) }}
     >
-      <Icon size={size * 0.46} color={color} strokeWidth={1.8} />
-      {ext && size >= 36 && (
-        <span
-          className="absolute -bottom-1 rounded-[4px] px-1 text-[8px] font-bold uppercase leading-[13px] tracking-wide text-white"
-          style={{ background: color }}
-        >
-          {ext.slice(0, 4)}
-        </span>
-      )}
+      <Icon size={Math.round(size * 0.42)} strokeWidth={1.5} />
     </div>
   );
 }

@@ -1,107 +1,116 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { HardDrive, Keyboard, Loader2, Moon, Sun } from "lucide-react";
+import { Command, Moon, Sun } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { navigate, useRoute, type Route } from "@/lib/router";
+import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/utils";
+import { t } from "@/lib/motion";
 import { Logo } from "./Logo";
 
+const SHORTCUTS: [string, string][] = [
+  ["Paste files", "⌘ V"],
+  ["Choose files", "⌘ O"],
+  ["Convert", "⌘ ↵"],
+  ["Close preview", "Esc"],
+  ["Previous / next", "← →"],
+  ["Zoom", "+ −"],
+  ["Play / pause", "Space"],
+];
+
+const NAV: [Route, string][] = [
+  ["convert", "Convert"],
+  ["open", "Open"],
+];
+
 export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onToggleTheme: () => void }) {
+  const route = useRoute();
+  const user = useAuth((s) => s.user);
+  const authStatus = useAuth((s) => s.status);
   const items = useStore((s) => s.items);
   const converting = items.filter((i) => i.status === "converting").length;
   const queued = items.filter((i) => i.status === "queued").length;
   const uploading = items.filter((i) => i.status === "uploading").length;
-  const busy = converting + queued + uploading > 0;
   const total = items.reduce((n, i) => n + i.size + (i.output?.size ?? 0), 0);
-  const [quota, setQuota] = useState<number | null>(null);
   const [showKeys, setShowKeys] = useState(false);
+  const keysRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    navigator.storage?.estimate?.().then((e) => setQuota(e.quota ?? null)).catch(() => {});
-  }, []);
+    if (!showKeys) return;
+    const close = (e: MouseEvent) => !keysRef.current?.contains(e.target as Node) && setShowKeys(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [showKeys]);
+
+  const status = converting
+    ? `Converting ${converting}${queued ? ` · ${queued} waiting` : ""}`
+    : uploading
+      ? `Adding ${uploading} file${uploading > 1 ? "s" : ""}`
+      : items.length
+        ? `${items.length} file${items.length > 1 ? "s" : ""} · ${formatBytes(total)}`
+        : "Ready";
+  const busy = converting + uploading > 0;
 
   return (
-    <header className="glass sticky top-0 z-40 border-x-0 border-t-0 !shadow-none">
-      <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4 sm:px-6">
-        <div className="flex items-center gap-2.5">
-          <Logo size={28} />
-          <span className="text-[15px] font-semibold tracking-[-0.01em]">
-            Omni<span className="text-muted">Convert</span>
-          </span>
-        </div>
+    <header className="material sticky top-0 z-40" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
+      <div className="mx-auto flex h-[52px] max-w-[1200px] items-center gap-4 px-6 md:px-10">
+        <a href="#/" className="flex items-center gap-2.5" aria-label="OmniConvert home">
+          <Logo size={22} />
+          <span className="font-display text-[17px] font-semibold tracking-[-0.02em] max-sm:hidden">OmniConvert</span>
+        </a>
+
+        <nav className="ml-2 flex items-center gap-1 md:ml-6" aria-label="Sections">
+          {NAV.map(([r, label]) => (
+            <button
+              key={r}
+              onClick={() => navigate(r)}
+              aria-current={route === r ? "page" : undefined}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-footnote transition-colors duration-200",
+                route === r ? "font-medium text-fg" : "text-muted hover:text-fg",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
 
         <div className="flex-1" />
 
-        {/* Live status badge */}
-        <motion.div
-          layout
-          className="flex items-center gap-2 rounded-full border hairline bg-surface/60 py-1 pl-2 pr-3 text-[12px] font-medium"
-          transition={{ type: "spring", stiffness: 400, damping: 32 }}
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            {busy ? (
-              <motion.span
-                key="busy"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="flex items-center gap-1.5 text-accent"
-              >
-                <Loader2 size={13} className="animate-spin" />
-                {uploading > 0 && !converting
-                  ? `Uploading ${uploading}`
-                  : `Converting ${converting}${queued ? ` · ${queued} queued` : ""}`}
-              </motion.span>
-            ) : (
-              <motion.span
-                key="idle"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="flex items-center gap-1.5"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-40" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
-                </span>
-                <span className="text-muted">Engine ready</span>
-              </motion.span>
-            )}
-          </AnimatePresence>
-          <span className="hidden h-3 w-px bg-fg/15 sm:block" />
-          <span className="hidden items-center gap-1 text-muted sm:flex" title="Stored locally in your browser">
-            <HardDrive size={12} />
-            {formatBytes(total)}
-            {quota ? <span className="text-subtle"> / {formatBytes(quota, 0)}</span> : null}
-          </span>
-        </motion.div>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={status}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={t.fast}
+            className="hidden items-center gap-2 text-footnote text-muted sm:flex"
+            aria-live="polite"
+          >
+            {busy && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
+            {status}
+          </motion.span>
+        </AnimatePresence>
 
-        <div className="relative hidden md:block">
-          <button className="icon-btn" onClick={() => setShowKeys((v) => !v)} aria-label="Keyboard shortcuts">
-            <Keyboard size={17} />
+        <div ref={keysRef} className="relative hidden md:block">
+          <button className="icon-btn" onClick={() => setShowKeys((v) => !v)} aria-label="Keyboard shortcuts" aria-expanded={showKeys}>
+            <Command size={16} strokeWidth={1.75} />
           </button>
           <AnimatePresence>
             {showKeys && (
               <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                transition={{ type: "spring", stiffness: 500, damping: 32 }}
-                className="glass-strong absolute right-0 top-11 w-64 origin-top-right rounded-2xl p-3 text-[12.5px] shadow-float"
-                onMouseLeave={() => setShowKeys(false)}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4, transition: t.fast }}
+                transition={t.base}
+                className="absolute right-0 top-12 w-64 rounded-2xl bg-elevated p-2 shadow-popover"
               >
-                <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">Shortcuts</p>
-                {[
-                  ["Paste files", "⌘/Ctrl V"],
-                  ["Open file picker", "⌘/Ctrl O"],
-                  ["Start conversion", "⌘/Ctrl ↵"],
-                  ["Close preview", "Esc"],
-                  ["Previous / next file", "← →"],
-                  ["Zoom in / out", "+ −"],
-                  ["Play / pause", "Space"],
-                ].map(([a, k]) => (
-                  <div key={a} className="flex items-center justify-between rounded-lg px-1 py-1.5">
-                    <span>{a}</span>
-                    <span className="kbd">{k}</span>
+                <p className="eyebrow px-3 pb-1 pt-2">Keyboard</p>
+                {SHORTCUTS.map(([label, key]) => (
+                  <div key={label} className="flex items-center justify-between px-3 py-2 text-footnote">
+                    <span>{label}</span>
+                    <span className="kbd">{key}</span>
                   </div>
                 ))}
               </motion.div>
@@ -109,24 +118,39 @@ export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onTo
           </AnimatePresence>
         </div>
 
-        <button
-          className="icon-btn relative overflow-hidden"
-          onClick={onToggleTheme}
-          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-        >
+        <button className="icon-btn" onClick={onToggleTheme} aria-label={`Use ${theme === "dark" ? "light" : "dark"} appearance`}>
           <AnimatePresence mode="wait" initial={false}>
             <motion.span
               key={theme}
-              initial={{ rotate: -90, scale: 0.4, opacity: 0 }}
-              animate={{ rotate: 0, scale: 1, opacity: 1 }}
-              exit={{ rotate: 90, scale: 0.4, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 500, damping: 26 }}
+              initial={{ opacity: 0, rotate: -30 }}
+              animate={{ opacity: 1, rotate: 0 }}
+              exit={{ opacity: 0, rotate: 30 }}
+              transition={t.fast}
               className="flex"
             >
-              {theme === "dark" ? <Moon size={17} /> : <Sun size={17} />}
+              {theme === "dark" ? <Moon size={16} strokeWidth={1.75} /> : <Sun size={16} strokeWidth={1.75} />}
             </motion.span>
           </AnimatePresence>
         </button>
+
+        {authStatus !== "loading" &&
+          (user ? (
+            <button
+              onClick={() => navigate("account")}
+              aria-label="Account"
+              title={user.email}
+              className={cn(
+                "-mr-1 flex h-8 w-8 items-center justify-center rounded-full bg-fg text-[13px] font-semibold text-bg transition duration-200 ease-apple hover:bg-fg/85 active:scale-95",
+                route === "account" && "ring-2 ring-accent ring-offset-2 ring-offset-bg",
+              )}
+            >
+              {user.name.slice(0, 1).toUpperCase()}
+            </button>
+          ) : (
+            <button className="btn-secondary -mr-1 h-8 px-3.5" onClick={() => navigate("account")}>
+              Sign in
+            </button>
+          ))}
       </div>
     </header>
   );

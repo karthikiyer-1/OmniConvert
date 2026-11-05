@@ -88,7 +88,7 @@ export function ImageViewer({ url, name }: { url: string; name: string }) {
       className="relative h-full w-full touch-none select-none overflow-hidden"
       style={{
         backgroundImage:
-          "linear-gradient(45deg, rgb(var(--fg)/0.045) 25%, transparent 25%), linear-gradient(-45deg, rgb(var(--fg)/0.045) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgb(var(--fg)/0.045) 75%), linear-gradient(-45deg, transparent 75%, rgb(var(--fg)/0.045) 75%)",
+          "linear-gradient(45deg, rgb(var(--fg)/0.025) 25%, transparent 25%), linear-gradient(-45deg, rgb(var(--fg)/0.025) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgb(var(--fg)/0.025) 75%), linear-gradient(-45deg, transparent 75%, rgb(var(--fg)/0.025) 75%)",
         backgroundSize: "20px 20px",
         backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0",
         cursor: dragging ? "grabbing" : scale > fit + 0.001 ? "grab" : "zoom-in",
@@ -118,14 +118,15 @@ export function ImageViewer({ url, name }: { url: string; name: string }) {
           alt={name}
           draggable={false}
           onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth || 800, h: e.currentTarget.naturalHeight || 600 })}
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: natural ? 1 : 0, scale: 1 }}
-          className="max-w-none shadow-float"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: natural ? 1 : 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="max-w-none"
           style={{
             width: natural?.w,
             height: natural?.h,
             transform: `translate3d(${pos.x}px, ${pos.y}px, 0) scale(${scale}) rotate(${rot}deg)`,
-            transition: dragging ? "none" : "transform 0.18s cubic-bezier(.2,.8,.2,1)",
+            transition: dragging ? "none" : "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
             imageRendering: scale > 3 ? "pixelated" : "auto",
           }}
         />
@@ -133,20 +134,20 @@ export function ImageViewer({ url, name }: { url: string; name: string }) {
 
       {/* Zoom controls */}
       <div
-        className="glass-strong absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full p-1 shadow-float"
+        className="material absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full p-1 shadow-popover"
         onPointerDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >
         <button className="icon-btn rounded-full" onClick={() => zoomTo(scale / 1.25)} title="Zoom out (−)">
           <Minus size={15} />
         </button>
-        <button className="w-14 text-center text-[12px] font-semibold tabular-nums" onClick={() => zoomTo(1)} title="Actual size (1)">
+        <button className="w-14 text-center text-caption font-medium tabular-nums" onClick={() => zoomTo(1)} title="Actual size (1)">
           {pct}%
         </button>
         <button className="icon-btn rounded-full" onClick={() => zoomTo(scale * 1.25)} title="Zoom in (+)">
           <Plus size={15} />
         </button>
-        <span className="mx-1 h-4 w-px bg-fg/15" />
+        <span className="mx-1 h-4 w-px bg-fg/10" />
         <button className="icon-btn rounded-full" onClick={resetFit} title="Fit (0)">
           <Maximize size={14} />
         </button>
@@ -158,7 +159,7 @@ export function ImageViewer({ url, name }: { url: string; name: string }) {
         </button>
       </div>
       {natural && (
-        <div className="glass-strong absolute left-4 top-4 rounded-full px-2.5 py-1 text-[11px] font-medium text-muted">
+        <div className="material absolute left-6 top-6 rounded-full px-3 py-1 text-caption text-muted">
           {natural.w} × {natural.h}
         </div>
       )}

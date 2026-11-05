@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronLeft, ChevronRight, Cloud, Copy, Cpu, Download, Info, Loader2, Trash2, Wand2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Info, Loader2, X } from "lucide-react";
 import { origKey, outKey, useStore, FileItem } from "@/lib/store";
 import { useStoredBlob } from "@/lib/hooks";
 import { detectKind, isBrowserImage, isTextual, KIND_LABEL, outputsFor } from "@/lib/formats";
 import { cn, formatBytes, formatDuration } from "@/lib/utils";
-import { FileIcon } from "../FileIcon";
+import { t } from "@/lib/motion";
 import { StatusBadge } from "../StatusBadge";
 import { ProgressBar } from "../ProgressBar";
 import { FormatSelect } from "../FormatSelect";
 import { downloadItem } from "../FileCard";
+import { openLibraryItem } from "../opener/OpenerPage";
+import { navigate } from "@/lib/router";
 import { ImageViewer } from "./ImageViewer";
 import { MediaPlayer } from "./MediaPlayer";
 import { TextViewer } from "./TextViewer";
@@ -45,21 +47,22 @@ export function PreviewModal() {
       {item && (
         <motion.div
           key="backdrop"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-md sm:p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[20px] md:p-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, pointerEvents: "none", transition: { duration: 0.2 } }}
+          exit={{ opacity: 0, pointerEvents: "none", transition: t.fast }}
+          transition={t.base}
           onClick={() => open(null)}
         >
           <motion.div
             role="dialog"
             aria-modal
             aria-label={`Preview ${item.name}`}
-            initial={{ opacity: 0, scale: 0.94, y: 24 }}
+            initial={{ opacity: 0, scale: 0.98, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.18 } }}
-            transition={{ type: "spring", stiffness: 380, damping: 32 }}
-            className="glass-strong relative flex h-full w-full max-w-[1280px] flex-col overflow-hidden shadow-modal sm:h-[min(880px,92dvh)] sm:rounded-[24px]"
+            exit={{ opacity: 0, scale: 0.98, y: 8, transition: t.fast }}
+            transition={t.slow}
+            className="relative flex h-full w-full max-w-[1280px] flex-col overflow-hidden bg-surface shadow-modal md:h-[min(880px,92dvh)] md:rounded-card"
             onClick={(e) => e.stopPropagation()}
           >
             <PreviewBody item={item} items={items} />
@@ -90,19 +93,18 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
   const name = showingOutput ? item.output!.name : item.name;
   const ext = real ? item.output!.ext : item.ext;
   const kind = real ? detectKind(item.output!.name, item.output!.mime) : item.kind;
-
   const idx = items.findIndex((i) => i.id === item.id);
 
   let viewer: React.ReactNode;
   if (item.status === "uploading" || loading) {
     viewer = (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-muted">
-        <Loader2 size={24} className="animate-spin" />
-        <p className="text-[13px]">{item.status === "uploading" ? `Uploading… ${item.progress}%` : "Opening…"}</p>
+        <Loader2 size={20} strokeWidth={1.75} className="animate-spin" />
+        <p className="text-footnote">{item.status === "uploading" ? `Adding… ${item.progress}%` : "Opening…"}</p>
       </div>
     );
   } else if (!blob || !url) {
-    viewer = <InfoCard kind={kind} name={name} message="The file's bytes are no longer in browser storage. Metadata is shown on the right." />;
+    viewer = <InfoCard kind={kind} name={name} message="This file's contents are no longer stored in your browser." />;
   } else if (kind === "image" && isBrowserImage(ext)) {
     viewer = <ImageViewer key={url} url={url} name={name} />;
   } else if (kind === "video" || kind === "audio") {
@@ -117,55 +119,64 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
     viewer = <InfoCard kind={kind} name={name} blob={blob} />;
   }
 
+  const download = () => downloadItem(item, showingOutput ? "output" : "original");
+
   return (
     <>
       {/* Title bar */}
-      <div className="flex items-center gap-2 border-b hairline px-3 py-2.5 sm:px-4">
-        <div className="flex items-center gap-1 max-sm:hidden">
-          <button className="icon-btn" disabled={idx <= 0} onClick={() => open(items[idx - 1].id)} title="Previous (←)">
-            <ChevronLeft size={18} />
+      <div className="flex h-16 shrink-0 items-center gap-2 px-4 md:px-5" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
+        <div className="flex items-center max-sm:hidden">
+          <button className="icon-btn" disabled={idx <= 0} onClick={() => open(items[idx - 1].id)} aria-label="Previous file">
+            <ChevronLeft size={18} strokeWidth={1.75} />
           </button>
-          <button className="icon-btn" disabled={idx >= items.length - 1} onClick={() => open(items[idx + 1].id)} title="Next (→)">
-            <ChevronRight size={18} />
+          <button className="icon-btn" disabled={idx >= items.length - 1} onClick={() => open(items[idx + 1].id)} aria-label="Next file">
+            <ChevronRight size={18} strokeWidth={1.75} />
           </button>
         </div>
-        <FileIcon kind={kind} size={32} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-semibold">{name}</p>
-          <p className="truncate text-[11.5px] text-muted">
+        <div className="min-w-0 flex-1 px-1">
+          <p className="truncate text-body font-semibold">{name}</p>
+          <p className="truncate text-caption text-muted">
             {KIND_LABEL[kind]} · {formatBytes(showingOutput ? item.output!.size : item.size)}
-            {!showingOutput && item.width && item.height ? ` · ${item.width}×${item.height}` : ""}
+            {!showingOutput && item.width && item.height ? ` · ${item.width} × ${item.height}` : ""}
             {!showingOutput && item.duration ? ` · ${formatDuration(item.duration)}` : ""}
-            <span className="max-sm:hidden"> · {idx + 1} of {items.length}</span>
           </p>
         </div>
 
         {hasOutput && (
-          // Plain CSS pill: a framer `layoutId` here keeps the modal mounted after exit.
-          <div className="relative grid grid-cols-2 rounded-[9px] bg-fg/[0.06] p-[3px] text-[12px] font-medium max-md:hidden">
+          // CSS thumb on purpose: a framer `layoutId` here keeps the modal mounted after exit.
+          <div className="segmented grid-cols-2 max-md:hidden" role="group" aria-label="Version">
             <span
-              className="absolute bottom-[3px] left-[3px] top-[3px] w-[calc(50%-3px)] rounded-[7px] bg-surface shadow-[0_1px_3px_rgb(0_0_0/0.12)] transition-transform duration-300 ease-[cubic-bezier(.3,1.3,.5,1)] dark:bg-elevated"
-              style={{ transform: view === "output" ? "translateX(100%)" : "none" }}
+              className="segmented-thumb"
+              style={{ left: 2, width: "calc((100% - 4px) / 2)", transform: view === "output" ? "translateX(100%)" : "none" }}
             />
             {(["original", "output"] as const).map((v) => (
-              <button key={v} onClick={() => setView(v)} className={cn("relative rounded-[7px] px-3 py-1 uppercase transition-colors", view === v ? "text-fg" : "text-muted hover:text-fg")}>
+              <button key={v} className="segmented-item uppercase" aria-pressed={view === v} onClick={() => setView(v)}>
                 {v === "original" ? item.ext || "Original" : item.output!.ext}
               </button>
             ))}
           </div>
         )}
 
-        <button className="btn-tinted h-8 px-3 max-sm:hidden" onClick={() => downloadItem(item, showingOutput ? "output" : "original")}>
-          <Download size={14} /> Download
+        <button
+          className="btn-secondary ml-2"
+          disabled={item.status === "uploading"}
+          onClick={async () => {
+            if (await openLibraryItem(item)) {
+              open(null);
+              navigate("open");
+            }
+          }}
+        >
+          Edit
         </button>
-        <button className="icon-btn sm:hidden" onClick={() => downloadItem(item, showingOutput ? "output" : "original")} aria-label="Download">
-          <Download size={17} />
+        <button className="btn-secondary max-sm:hidden" onClick={download}>
+          Download
         </button>
-        <button className={cn("icon-btn", showInfo && "bg-fg/[0.08] text-fg")} onClick={() => setShowInfo((v) => !v)} title="File info">
-          <Info size={17} />
+        <button className={cn("icon-btn", showInfo && "bg-fg/[0.06] text-fg")} onClick={() => setShowInfo((v) => !v)} aria-label="Info" aria-pressed={showInfo}>
+          <Info size={18} strokeWidth={1.75} />
         </button>
-        <button className="icon-btn" onClick={() => open(null)} title="Close (Esc)">
-          <X size={18} />
+        <button className="icon-btn -mr-1" onClick={() => open(null)} aria-label="Close">
+          <X size={18} strokeWidth={1.75} />
         </button>
       </div>
 
@@ -173,16 +184,16 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={`${item.id}-${view}`}
-            initial={{ opacity: 0, scale: 0.985 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.985 }}
-            transition={{ duration: 0.18 }}
-            className="relative min-w-0 flex-1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={t.fast}
+            className="relative min-w-0 flex-1 bg-bg/60"
           >
             {viewer}
             {showingOutput && item.output!.simulated && (
-              <div className="glass-strong pointer-events-none absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-medium text-violet shadow-soft">
-                <Cloud size={12} /> Simulated {item.output!.ext.toUpperCase()} — previewing source bytes
+              <div className="material pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full px-4 py-1.5 text-caption text-muted">
+                Simulated {item.output!.ext.toUpperCase()} · showing the original
               </div>
             )}
           </motion.div>
@@ -194,10 +205,11 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: "auto", opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 400, damping: 38 }}
-              className="overflow-hidden border-l hairline bg-surface/40 max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-10 max-lg:bg-elevated/95 max-lg:backdrop-blur-xl"
+              transition={t.base}
+              className="overflow-hidden bg-surface max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-10 max-lg:shadow-modal"
+              style={{ boxShadow: "-1px 0 0 var(--hairline)" }}
             >
-              <InfoPanel item={item} onRemove={() => remove(item.id)} />
+              <InfoPanel item={item} onRemove={() => remove(item.id)} onDownload={download} />
             </motion.aside>
           )}
         </AnimatePresence>
@@ -211,128 +223,117 @@ function sizeDelta(from: number, to: number) {
   return pct === 0 ? "same size" : `${pct < 0 ? "−" : "+"}${Math.abs(pct)}%`;
 }
 
-function InfoPanel({ item, onRemove }: { item: FileItem; onRemove: () => void }) {
+function Row({ k, v, mono }: { k: string; v?: React.ReactNode; mono?: boolean }) {
+  if (v === undefined || v === "") return null;
+  return (
+    <div className="flex items-start justify-between gap-6 py-1.5">
+      <dt className="shrink-0 text-footnote text-muted">{k}</dt>
+      <dd className={cn("min-w-0 break-all text-right text-footnote", mono && "font-mono text-caption")}>{v}</dd>
+    </div>
+  );
+}
+
+function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: () => void; onDownload: () => void }) {
   const setTarget = useStore((s) => s.setTarget);
   const start = useStore((s) => s.start);
   const cancel = useStore((s) => s.cancel);
   const options = useMemo(() => outputsFor(item.kind, item.ext), [item.kind, item.ext]);
-  const busy = item.status === "converting" || item.status === "queued" || item.status === "uploading";
+  const running = item.status === "converting" || item.status === "queued";
+  const busy = running || item.status === "uploading";
   const [copied, setCopied] = useState(false);
 
-  const Row = ({ k, v, mono }: { k: string; v?: React.ReactNode; mono?: boolean }) =>
-    v === undefined || v === "" ? null : (
-      <div className="flex items-start justify-between gap-4 py-1.5 text-[12.5px]">
-        <span className="shrink-0 text-muted">{k}</span>
-        <span className={cn("min-w-0 break-all text-right font-medium", mono && "font-mono text-[11.5px]")}>{v}</span>
-      </div>
-    );
-
   return (
-    <div className="scroll-thin h-full w-[min(320px,100vw)] overflow-y-auto p-4">
-      {/* Convert / re-convert */}
-      <section className="rounded-2xl bg-fg/[0.04] p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Convert</p>
+    <div className="scroll-thin h-full w-[min(340px,100vw)] overflow-y-auto px-6 py-6">
+      {/* Convert */}
+      <section>
+        <div className="flex items-center justify-between">
+          <p className="eyebrow">Convert</p>
           <StatusBadge status={item.status} />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-md bg-fg/[0.07] px-2 py-1 text-[12px] font-semibold uppercase">{item.ext || "?"}</span>
-          <ChevronRight size={14} className="text-subtle" />
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-callout font-semibold uppercase">{item.ext || "—"}</span>
+          <ChevronRight size={16} strokeWidth={1.75} className="text-subtle" />
           <FormatSelect size="sm" options={options} value={item.target} onChange={(e) => setTarget(item.id, e)} disabled={busy} />
-          <div className="flex-1" />
-          {item.status === "converting" || item.status === "queued" ? (
-            <button className="btn-ghost h-8 px-2.5 text-[12px]" onClick={() => cancel(item.id)}>
+        </div>
+        <div className="mt-4 flex gap-2">
+          {running ? (
+            <button className="btn-secondary flex-1" onClick={() => cancel(item.id)}>
               Stop
             </button>
           ) : (
-            <button className="btn-primary h-8 px-3 text-[12px]" disabled={busy || !item.target} onClick={() => start([item.id])}>
-              <Wand2 size={13} /> {item.status === "ready" ? "Again" : "Convert"}
+            <button className="btn-secondary flex-1 !bg-fg !text-bg hover:!bg-fg/85" disabled={busy || !item.target} onClick={() => start([item.id])}>
+              {item.status === "ready" ? "Convert again" : "Convert"}
             </button>
           )}
+          <button className="btn-secondary sm:hidden" onClick={onDownload}>
+            Download
+          </button>
         </div>
-        {(item.status === "converting" || item.status === "queued") && (
-          <div className="mt-3">
-            <ProgressBar value={item.progress} active={item.status === "converting"} />
-            <p className="mt-1 flex justify-between text-[10.5px] text-muted">
+        {running && (
+          <div className="mt-4">
+            <ProgressBar value={item.progress} muted={item.status === "queued"} />
+            <p className="mt-1.5 flex justify-between gap-4 text-caption text-muted">
               <span className="truncate">{item.stage}</span>
               <span className="tabular-nums">{item.progress}%</span>
             </p>
           </div>
         )}
-        {item.status === "failed" && item.error && <p className="mt-2 text-[11.5px] text-danger">{item.error}</p>}
+        {item.status === "failed" && item.error && <p className="mt-3 text-footnote text-danger">{item.error}</p>}
       </section>
 
       {item.output && (
-        <section className="mt-4">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">Output</p>
-          <div className="divide-y divide-[rgb(var(--line)/0.08)]">
-            <Row k="File" v={item.output.name} />
-            <Row k="Format" v={item.output.ext.toUpperCase()} />
-            <Row k="Size" v={`${formatBytes(item.output.size)}${item.output.simulated ? "" : ` (${sizeDelta(item.size, item.output.size)})`}`} />
-            <Row
-              k="Engine"
-              v={
-                item.output.simulated ? (
-                  <span className="inline-flex items-center gap-1 text-violet">
-                    <Cloud size={12} /> Cloud (simulated)
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-success">
-                    <Cpu size={12} /> On-device
-                  </span>
-                )
-              }
-            />
-            <Row k="Took" v={`${(item.output.durationMs / 1000).toFixed(1)} s`} />
-            <Row k="MIME" v={item.output.mime} mono />
-          </div>
-          {item.output.note && <p className="mt-2 rounded-xl bg-violet/[0.08] px-3 py-2 text-[11.5px] leading-snug text-violet">{item.output.note}</p>}
+        <section className="mt-10">
+          <p className="eyebrow mb-2">Output</p>
+          <dl>
+            <Row k="Name" v={item.output.name} />
+            <Row k="Size" v={`${formatBytes(item.output.size)}${item.output.simulated ? "" : ` · ${sizeDelta(item.size, item.output.size)}`}`} />
+            <Row k="Engine" v={item.output.simulated ? "Simulated" : "On this device"} />
+            <Row k="Time" v={`${(item.output.durationMs / 1000).toFixed(1)} s`} />
+            <Row k="Type" v={item.output.mime} mono />
+          </dl>
+          {item.output.note && <p className="mt-3 text-footnote text-muted">{item.output.note}</p>}
         </section>
       )}
 
-      <section className="mt-4">
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">Source</p>
-        <div className="divide-y divide-[rgb(var(--line)/0.08)]">
+      <section className="mt-10">
+        <p className="eyebrow mb-2">Original</p>
+        <dl>
           <Row k="Name" v={item.name} />
           <Row k="Kind" v={KIND_LABEL[item.kind]} />
-          <Row k="MIME type" v={item.mime || "unknown"} mono />
+          <Row k="Type" v={item.mime || "unknown"} mono />
           <Row k="Size" v={`${formatBytes(item.size)} (${item.size.toLocaleString()} bytes)`} />
-          <Row k="Dimensions" v={item.width && item.height ? `${item.width} × ${item.height} px` : undefined} />
-          <Row k="Megapixels" v={item.width && item.height ? (((item.width * item.height) / 1e6).toFixed(2) + " MP") : undefined} />
+          <Row k="Dimensions" v={item.width && item.height ? `${item.width} × ${item.height}` : undefined} />
           <Row k="Duration" v={item.duration ? formatDuration(item.duration) : undefined} />
-          <Row k="Modified" v={new Date(item.lastModified).toLocaleString()} />
-          <Row k="Added" v={new Date(item.addedAt).toLocaleString()} />
-        </div>
+          <Row k="Modified" v={new Date(item.lastModified).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} />
+          <Row k="Added" v={new Date(item.addedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} />
+        </dl>
       </section>
 
-      <section className="mt-4">
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-subtle">Integrity</p>
-        <div className="rounded-xl bg-fg/[0.04] p-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11.5px] text-muted">SHA-256</span>
-            {item.sha256 && (
-              <button
-                className="icon-btn h-6 w-6"
-                title="Copy checksum"
-                onClick={() =>
-                  navigator.clipboard.writeText(item.sha256!).then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1400);
-                  })
-                }
-              >
-                {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
-              </button>
-            )}
-          </div>
-          <p className="mt-1 break-all font-mono text-[10.5px] leading-relaxed text-fg/80">
-            {item.sha256 ?? (item.status === "uploading" ? "Computing…" : "Not computed (file too large)")}
-          </p>
+      <section className="mt-10">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="eyebrow">SHA-256</p>
+          {item.sha256 && (
+            <button
+              className="icon-btn -mr-2 h-7 w-7"
+              aria-label="Copy checksum"
+              onClick={() =>
+                navigator.clipboard.writeText(item.sha256!).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1400);
+                })
+              }
+            >
+              {copied ? <Check size={14} className="text-success" /> : <Copy size={14} strokeWidth={1.75} />}
+            </button>
+          )}
         </div>
+        <p className="break-all font-mono text-caption leading-5 text-muted">
+          {item.sha256 ?? (item.status === "uploading" ? "Calculating…" : "Not calculated (file too large)")}
+        </p>
       </section>
 
-      <button className="btn mt-5 w-full text-danger hover:bg-danger/10" onClick={onRemove}>
-        <Trash2 size={14} /> Remove from shelf
+      <button className="btn-text mt-10 -ml-3 text-danger hover:bg-danger/[0.06]" onClick={onRemove}>
+        Remove file
       </button>
     </div>
   );

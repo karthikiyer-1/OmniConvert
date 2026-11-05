@@ -55,29 +55,29 @@ export function TextViewer({ blob, ext }: { blob: Blob; ext: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-1 border-b hairline px-3 py-1.5 text-[12px] text-muted">
-        <span className="rounded-md bg-fg/[0.06] px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase text-fg/80">{languageFor(ext)}</span>
+      <div className="flex h-12 shrink-0 items-center gap-1 px-4 text-caption text-muted" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
+        <span className="font-medium uppercase tracking-[0.06em] text-fg">{languageFor(ext)}</span>
         <span className="ml-2">
           {text.split("\n").length.toLocaleString()} lines · {formatBytes(blob.size)}
           {truncated && " · showing first 1 MB"}
         </span>
         <div className="flex-1" />
         {tabular && (
-          <button className="icon-btn h-7 w-7" onClick={() => setMode((m) => (m === "table" ? "source" : "table"))} title={mode === "table" ? "Show source" : "Show table"}>
+          <button className="icon-btn h-8 w-8" onClick={() => setMode((m) => (m === "table" ? "source" : "table"))} title={mode === "table" ? "Show source" : "Show table"}>
             {mode === "table" ? <Code2 size={14} /> : <Table2 size={14} />}
           </button>
         )}
-        <button className="icon-btn h-7 w-7" onClick={() => setFont((f) => Math.max(10, f - 1))} title="Smaller text">
+        <button className="icon-btn h-8 w-8" onClick={() => setFont((f) => Math.max(10, f - 1))} title="Smaller text">
           <AArrowDown size={15} />
         </button>
-        <button className="icon-btn h-7 w-7" onClick={() => setFont((f) => Math.min(20, f + 1))} title="Larger text">
+        <button className="icon-btn h-8 w-8" onClick={() => setFont((f) => Math.min(20, f + 1))} title="Larger text">
           <AArrowUp size={15} />
         </button>
-        <button className={cn("icon-btn h-7 w-7", wrap && "bg-accent/10 !text-accent")} onClick={() => setWrap((w) => !w)} title="Wrap lines">
+        <button className={cn("icon-btn h-8 w-8", wrap && "bg-fg/[0.06] !text-fg")} onClick={() => setWrap((w) => !w)} title="Wrap lines">
           <WrapText size={14} />
         </button>
         <button
-          className="icon-btn h-7 w-7"
+          className="icon-btn h-8 w-8"
           title="Copy"
           onClick={() => {
             navigator.clipboard.writeText(text).then(() => {
@@ -92,12 +92,12 @@ export function TextViewer({ blob, ext }: { blob: Blob; ext: string }) {
 
       {mode === "table" && rows ? (
         <div className="scroll-thin min-h-0 flex-1 overflow-auto">
-          <table className="w-full border-collapse text-[12.5px]">
+          <table className="w-full border-collapse text-footnote">
             <thead className="sticky top-0 z-10">
-              <tr className="glass-strong">
-                <th className="w-10 border-b hairline px-2 py-2 text-right font-mono text-[10.5px] font-normal text-subtle">#</th>
+              <tr className="bg-surface" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
+                <th className="w-12 px-3 py-2.5 text-right font-mono text-caption font-normal text-subtle">#</th>
                 {rows[0]?.map((h, i) => (
-                  <th key={i} className="whitespace-nowrap border-b hairline px-3 py-2 text-left font-semibold">
+                  <th key={i} className="whitespace-nowrap px-4 py-2.5 text-left font-semibold">
                     {h}
                   </th>
                 ))}
@@ -105,10 +105,10 @@ export function TextViewer({ blob, ext }: { blob: Blob; ext: string }) {
             </thead>
             <tbody>
               {rows.slice(1).map((r, ri) => (
-                <tr key={ri} className="odd:bg-fg/[0.025] hover:bg-accent/[0.06]">
-                  <td className="px-2 py-1.5 text-right font-mono text-[10.5px] text-subtle">{ri + 1}</td>
+                <tr key={ri} className="even:bg-fg/[0.02] hover:bg-fg/[0.04]">
+                  <td className="px-3 py-2 text-right font-mono text-caption text-subtle">{ri + 1}</td>
                   {rows[0].map((_, ci) => (
-                    <td key={ci} className="max-w-[280px] truncate whitespace-nowrap px-3 py-1.5">
+                    <td key={ci} className="max-w-[280px] truncate whitespace-nowrap px-4 py-2">
                       {r[ci]}
                     </td>
                   ))}
@@ -119,7 +119,7 @@ export function TextViewer({ blob, ext }: { blob: Blob; ext: string }) {
         </div>
       ) : (
         <div className="scroll-thin min-h-0 flex-1 overflow-auto">
-          <pre className="hljs min-w-fit py-3 font-mono" style={{ fontSize: font, lineHeight: 1.6 }}>
+          <pre className="hljs min-w-fit py-4 font-mono" style={{ fontSize: font, lineHeight: 1.6 }}>
             {lines.map((l, i) => (
               <div key={i} className="flex hover:bg-fg/[0.035]">
                 <span className="shrink-0 select-none pl-3 pr-4 text-right text-subtle/70" style={{ width: `${gutter + 3}ch` }}>

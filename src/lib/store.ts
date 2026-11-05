@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
 import { detectKind, extFromMime, extOf, FileKind, mimeFor, outputsFor } from "./formats";
 import { clearBlobs, deleteBlob, getBlob, putBlob } from "./db";
 import { convertReal } from "./converters";
@@ -41,6 +40,16 @@ export interface FileItem {
   seq?: number;
 }
 
+export type HistoryType = "added" | "converted" | "failed" | "removed" | "edited" | "cleared" | "signed-in" | "account-created";
+
+export interface HistoryEvent {
+  id: string;
+  at: number;
+  type: HistoryType;
+  name: string;
+  detail?: string;
+}
+
 export interface Toast {
   id: string;
   title: string;
@@ -50,6 +59,12 @@ export interface Toast {
 
 interface State {
   items: FileItem[];
+  history: HistoryEvent[];
+  /** False until the active vault (guest or account) has been loaded. */
+  hydrated: boolean;
+  hydrate: (data: { items: FileItem[]; history: HistoryEvent[] }) => void;
+  log: (type: HistoryType, name: string, detail?: string) => void;
+  clearHistory: () => void;
   toasts: Toast[];
   previewId: string | null;
   addFiles: (files: File[]) => void;
@@ -74,12 +89,25 @@ const MAX_CONCURRENT = 2;
 let seqCounter = Date.now();
 const controllers = new Map<string, AbortController>();
 
-export const useStore = create<State>()(
-  persist(
-    (set, get) => ({
+const HISTORY_LIMIT = 500;
+
+export const useStore = create<State>()((set, get) => ({
       items: [],
+      history: [],
+      hydrated: false,
       toasts: [],
       previewId: null,
+
+      hydrate: ({ items, history }) => {
+        controllers.forEach((c) => c.abort());
+        controllers.clear();
+        set({ items: normalize(items), history, hydrated: true, previewId: null });
+      },
+
+      log: (type, name, detail) =>
+        set((s) => ({ history: [{ id: uid(), at: Date.now(), type, name, detail }, ...s.history].slice(0, HISTORY_LIMIT) })),
+
+      clearHistory: () => set({ history: [] }),
 
       addFiles: (files) => {
         if (!files.length) return;
@@ -107,6 +135,7 @@ export const useStore = create<State>()(
         });
         set((s) => ({ items: [...fresh, ...s.items] }));
         fresh.forEach((item, i) => ingest(item, files[i]));
+        fresh.forEach((item) => get().log("added", item.name));
         get().toast({
           tone: "info",
           title: files.length === 1 ? `Added ${fresh[0].name}` : `Added ${files.length} files`,
@@ -156,6 +185,8 @@ export const useStore = create<State>()(
       retry: (id) => get().start([id]),
 
       remove: (id) => {
+        const gone = get().items.find((it) => it.id === id);
+        if (gone) get().log("removed", gone.output?.name ?? gone.name);
         controllers.get(id)?.abort();
         controllers.delete(id);
         set((s) => ({
@@ -170,8 +201,10 @@ export const useStore = create<State>()(
       clearAll: () => {
         controllers.forEach((c) => c.abort());
         controllers.clear();
+        const n = get().items.length;
         set({ items: [], previewId: null });
         clearBlobs();
+        if (n) get().log("cleared", `${n} file${n > 1 ? "s" : ""}`);
       },
 
       clearFinished: () => {
@@ -191,26 +224,16 @@ export const useStore = create<State>()(
         setTimeout(() => get().dismissToast(id), t.tone === "error" ? 6000 : 3200);
       },
       dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-    }),
-    {
-      name: "omniconvert-history",
-      version: 1,
-      storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ items: s.items }),
-      // Work that was in flight when the page closed can't resume mid-stream.
-      onRehydrateStorage: () => (state) => {
-        if (!state) return;
-        state.items = state.items.map((it) => {
-          if (it.status === "uploading")
-            return { ...it, status: "failed", progress: 0, stage: undefined, error: "Upload interrupted by page reload" };
-          if (it.status === "queued" || it.status === "converting")
-            return { ...it, status: "pending", progress: 0, stage: undefined, error: undefined };
-          return it;
-        });
-      },
-    },
-  ),
-);
+}));
+
+/** Work in flight when the page closed (or the account switched) can't resume mid-stream. */
+function normalize(items: FileItem[]): FileItem[] {
+  return items.map((it) => {
+    if (it.status === "uploading") return { ...it, status: "failed", progress: 0, stage: undefined, error: "Interrupted before it finished adding" };
+    if (it.status === "queued" || it.status === "converting") return { ...it, status: "pending", progress: 0, stage: undefined, error: undefined };
+    return it;
+  });
+}
 
 function defaultTarget(kind: FileKind, ext: string) {
   const opts = outputsFor(kind, ext);
@@ -384,6 +407,7 @@ async function runJob(id: string) {
     await putBlob(outKey(id), output!);
 
     const durationMs = Math.round(performance.now() - t0);
+    useStore.getState().log("converted", item.name, `${item.ext.toUpperCase()} → ${target.toUpperCase()}${simulated ? " (simulated)" : ""}`);
     update({
       status: "ready",
       progress: 100,
@@ -402,6 +426,7 @@ async function runJob(id: string) {
   } catch (e) {
     if (e instanceof Cancelled || ctrl.signal.aborted) return;
     useStore.getState().update(id, { status: "failed", stage: undefined, error: (e as Error).message });
+    useStore.getState().log("failed", item.name, (e as Error).message);
     useStore.getState().toast({ tone: "error", title: `Couldn't convert ${item.name}`, body: (e as Error).message });
   } finally {
     controllers.delete(id);
