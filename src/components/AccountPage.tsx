@@ -279,6 +279,7 @@ const VERB: Record<HistoryEvent["type"], string> = {
   cleared: "Cleared",
   "signed-in": "Signed in",
   "account-created": "Created account",
+  visited: "Visited",
 };
 
 function dayLabel(ts: number) {

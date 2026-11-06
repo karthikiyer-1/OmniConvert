@@ -11,6 +11,7 @@ import { Toasts } from "@/components/Toasts";
 import { PreviewModal } from "@/components/preview/PreviewModal";
 import { OpenerPage } from "@/components/opener/OpenerPage";
 import { AccountPage } from "@/components/AccountPage";
+import { BrowsePage } from "@/components/browse/BrowsePage";
 import { useAuth } from "@/lib/auth";
 import { flush, startAutosave } from "@/lib/persistence";
 import { navigate, useRoute } from "@/lib/router";
@@ -58,6 +59,7 @@ export default function App() {
     const onPaste = (e: ClipboardEvent) => {
       if (isField(e.target)) return;
       const files = [...(e.clipboardData?.files ?? [])];
+      if (window.location.hash.startsWith("#/browse")) return; // let the address bar / page handle it
       const onOpen = window.location.hash.startsWith("#/open");
       if (files.length) {
         e.preventDefault();
@@ -105,7 +107,7 @@ export default function App() {
       const files = [...(e.dataTransfer?.files ?? [])];
       if (!files.length) return;
       if (window.location.hash.startsWith("#/open")) useOpener.getState().open(files[0], files[0].name);
-      else if (!window.location.hash.startsWith("#/account")) useStore.getState().addFiles(files);
+      else if (!/^#\/(account|browse)/.test(window.location.hash)) useStore.getState().addFiles(files);
     };
 
     window.addEventListener("paste", onPaste);
@@ -157,6 +159,9 @@ export default function App() {
               </div>
               <div hidden={route !== "open"}>
                 <OpenerPage />
+              </div>
+              <div hidden={route !== "browse"}>
+                <BrowsePage />
               </div>
               <div hidden={route !== "account"}>
                 <AccountPage />

@@ -40,7 +40,7 @@ export interface FileItem {
   seq?: number;
 }
 
-export type HistoryType = "added" | "converted" | "failed" | "removed" | "edited" | "cleared" | "signed-in" | "account-created";
+export type HistoryType = "added" | "converted" | "failed" | "removed" | "edited" | "cleared" | "signed-in" | "account-created" | "visited";
 
 export interface HistoryEvent {
   id: string;

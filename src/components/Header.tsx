@@ -22,6 +22,7 @@ const SHORTCUTS: [string, string][] = [
 const NAV: [Route, string][] = [
   ["convert", "Convert"],
   ["open", "Open"],
+  ["browse", "Browse"],
 ];
 
 export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onToggleTheme: () => void }) {
@@ -62,20 +63,20 @@ export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onTo
       className="material sticky top-0 z-40"
       style={{ boxShadow: "0 1px 0 var(--hairline)", paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="safe-x mx-auto flex h-[52px] max-w-[1200px] items-center gap-4 md:!px-10">
+      <div className="safe-x mx-auto flex h-[52px] max-w-[1200px] items-center gap-2 max-sm:!px-4 sm:gap-4 md:!px-10">
         <a href="#/" className="flex items-center gap-2.5 rounded-lg" aria-label="OmniConvert home" translate="no">
           <Logo size={22} />
           <span className="font-display text-[17px] font-semibold tracking-[-0.02em] max-sm:hidden">OmniConvert</span>
         </a>
 
-        <nav className="ml-2 flex items-center gap-1 md:ml-6" aria-label="Sections">
+        <nav className="flex items-center gap-0.5 sm:ml-2 sm:gap-1 md:ml-6" aria-label="Sections">
           {NAV.map(([r, label]) => (
             <a
               key={r}
               href={hrefFor(r)}
               aria-current={route === r ? "page" : undefined}
               className={cn(
-                "rounded-full px-3 py-1.5 text-footnote transition-colors duration-200",
+                "rounded-full px-2.5 py-1.5 text-footnote transition-colors duration-200 sm:px-3",
                 route === r ? "bg-fg/[0.06] font-medium text-fg" : "text-muted hover:bg-fg/[0.04] hover:text-fg",
               )}
             >
@@ -158,7 +159,7 @@ export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onTo
               {user.name.slice(0, 1).toUpperCase()}
             </a>
           ) : (
-            <a className="btn-secondary -mr-1 h-8 px-3.5" href={hrefFor("account")}>
+            <a className="btn-secondary -mr-1 h-8 shrink-0 px-3 sm:px-3.5" href={hrefFor("account")}>
               Sign In
             </a>
           ))}

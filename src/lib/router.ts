@@ -4,8 +4,8 @@ import { useSyncExternalStore } from "react";
  * Hash routing with query params: `#/open`, `#/?filter=ready&file=abc`.
  * Works on any static host (Vercel included) and keeps UI state deep-linkable.
  */
-export type Route = "convert" | "open" | "account";
-const ROUTES: Route[] = ["convert", "open", "account"];
+export type Route = "convert" | "open" | "browse" | "account";
+const ROUTES: Route[] = ["convert", "open", "browse", "account"];
 
 function parse() {
   const raw = window.location.hash.replace(/^#\/?/, "");

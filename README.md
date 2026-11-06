@@ -24,7 +24,7 @@ No environment variables are needed. From the CLI: `npx vercel --prod`.
 
 ## Features
 
-The app has three sections: **Convert**, **Open** and **Account**. It follows the system's light or dark appearance (with a toggle), and guests' files are kept in the browser between visits.
+The app has four sections: **Convert**, **Open**, **Browse** and **Account**. It follows the system's light or dark appearance (with a toggle), and guests' files are kept in the browser between visits.
 
 ### Convert
 - Drop files, choose them, or paste with `⌘/Ctrl V`. Pick one target format
@@ -47,6 +47,24 @@ The app has three sections: **Convert**, **Open** and **Account**. It follows th
 - **Everything else:** a viewer, plus "Edit as text" for files under 5 MB.
 - Edits can be downloaded or saved back into Files. "Edit" in the preview
   opens any file from your list here.
+
+### Browse (in-app web browser)
+- Tabs (up to 8) that keep their pages loaded while you switch between them,
+  with an address bar for URLs or searches (DuckDuckGo), back, forward,
+  reload/stop and a loading bar.
+- Tabs, back/forward history and recently visited sites are saved, and
+  encrypted with everything else for signed-in accounts. The open page is
+  in the URL (`#/browse?url=…`).
+- YouTube links (`watch`, `youtu.be`, `shorts`) open in YouTube's
+  privacy-enhanced embed player, which is allowed inside other sites.
+- **Limit:** many sites (Google, GitHub, most social networks) forbid being
+  shown inside another website, and browsers enforce that. OmniConvert
+  detects this before loading and shows a "Can't Be Shown Here" card with
+  **Open in New Tab** instead of a blank frame.
+- Because pages are other websites (cross-origin), the app can't read where
+  a page's own links lead. Address-bar navigation is tracked exactly. After
+  you click links inside a page, **Back** returns to the page you opened.
+- Pages run in a sandboxed `<iframe>` with no access to OmniConvert's data.
 
 ### Account
 - Create an account or sign in. **Stay signed in** keeps you signed in on
@@ -112,6 +130,16 @@ on every screen in light and dark mode.
 - Notch-safe layout, `theme-color`, `touch-action: manipulation`, and
   dates, times and numbers formatted with `Intl`.
 
+## Serverless function
+
+`api/frame-check.js` (deployed automatically by Vercel) tells the Browse
+panel whether a site allows embedding (`X-Frame-Options` / CSP
+`frame-ancestors`) and returns the page title. It reads response headers and
+at most 96 KB of HTML and never forwards page content, so it isn't a proxy.
+It only fetches public `http(s)` addresses on standard ports: every redirect
+hop is checked against private, loopback and link-local ranges (including
+cloud metadata IPs), and the connection is pinned to the checked IP.
+
 ## Real and simulated conversions
 
 The browser does these conversions itself (marked **On-device** in the
@@ -166,10 +194,14 @@ src/
     auth.ts                on-device accounts: sign up/in/out, stay signed in, change password, delete
     persistence.ts         saves each vault (guest: localStorage, account: encrypted IndexedDB)
     router.ts / opener.ts  hash routes; the file open in the editor
+    browser.ts             Browse tabs, per-tab history, address-bar parsing
     exportZip.ts           "Download All as ZIP"
   components/
     Header, Workspace (dropzone + format bar), Shelf, FileCard, FormatSelect, Toasts
     AccountPage            sign in / create account, history, security
     opener/                OpenerPage, ImageEditor, TextEditor, MediaEditors
+    browse/                BrowsePage (tabs, toolbar, sandboxed frames, start page)
+api/
+  frame-check.js           Vercel function: can this URL be embedded? + page title
     preview/               PreviewModal, ImageViewer, MediaPlayer, TextViewer, FallbackViews
 ```

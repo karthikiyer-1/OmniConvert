@@ -29,6 +29,7 @@ import {
 import { deleteNamespace, getBlob, idbDelete, idbGet, idbPut, idbValues, putBlob, setVault } from "./db";
 import { flush, loadVault, sweepOrphans } from "./persistence";
 import { commitPendingDeletions, origKey, outKey, useStore } from "./store";
+import { useBrowser } from "./browser";
 import { uid } from "./utils";
 
 interface AccountRecord {
@@ -143,6 +144,7 @@ async function enterVault(prefix: string, key: CryptoKey | null) {
   setVault({ prefix, key });
   const data = await loadVault();
   useStore.getState().hydrate(data);
+  useBrowser.getState().hydrate(data.browser);
   void sweepOrphans(data.items);
 }
 
@@ -216,6 +218,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     setVault({ prefix: prefixFor(acct.id), key });
     for (const [k, b] of carried.blobs) await putBlob(k, b);
     useStore.getState().hydrate({ items: carried.items, history: carried.history });
+    if (!importGuest) useBrowser.getState().hydrate();
     useStore.getState().log("account-created", name);
     if (importGuest && carried.items.length) {
       // The files now live (encrypted) in the account; remove the plain guest copies.

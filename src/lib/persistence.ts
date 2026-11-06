@@ -6,12 +6,17 @@
 import { getVault, idbDelete, idbGet, idbKeys, idbPut, type Vault } from "./db";
 import { isSealed, openJSON, sealJSON } from "./crypto";
 import { useStore, type FileItem, type HistoryEvent } from "./store";
+import { useBrowser } from "./browser";
 
 const GUEST_KEY = "omniconvert-history";
+
+type BrowserSnap = ReturnType<ReturnType<typeof useBrowser.getState>["snapshot"]>;
 
 interface Snapshot {
   items: FileItem[];
   history: HistoryEvent[];
+  /** Browse tabs + recent sites (encrypted along with everything else for accounts). */
+  browser?: BrowserSnap;
 }
 
 const empty = (): Snapshot => ({ items: [], history: [] });
@@ -22,12 +27,12 @@ export async function loadVault(v: Vault = getVault()): Promise<Snapshot> {
       const raw = localStorage.getItem(GUEST_KEY);
       if (!raw) return empty();
       const parsed = JSON.parse(raw);
-      return { items: parsed?.state?.items ?? [], history: parsed?.state?.history ?? [] };
+      return { items: parsed?.state?.items ?? [], history: parsed?.state?.history ?? [], browser: parsed?.state?.browser };
     }
     const sealed = await idbGet<unknown>("blobs", v.prefix + "meta");
     if (!sealed || !isSealed(sealed)) return empty();
     const data = await openJSON<Snapshot>(v.key, sealed);
-    return { items: data.items ?? [], history: data.history ?? [] };
+    return { items: data.items ?? [], history: data.history ?? [], browser: data.browser };
   } catch {
     return empty();
   }
@@ -38,13 +43,13 @@ async function write(v: Vault, snap: Snapshot) {
   const items = snap.items.map((i) => ({ ...i, stage: undefined }));
   if (!v.key) {
     try {
-      localStorage.setItem(GUEST_KEY, JSON.stringify({ state: { items, history: snap.history }, version: 2 }));
+      localStorage.setItem(GUEST_KEY, JSON.stringify({ state: { items, history: snap.history, browser: snap.browser }, version: 3 }));
     } catch {
       /* quota / private mode */
     }
     return;
   }
-  await idbPut("blobs", v.prefix + "meta", await sealJSON(v.key, { items, history: snap.history }));
+  await idbPut("blobs", v.prefix + "meta", await sealJSON(v.key, { items, history: snap.history, browser: snap.browser }));
 }
 
 let timer: number | undefined;
@@ -60,14 +65,26 @@ export async function flush() {
 
 /** Debounced auto-save, bound to the vault that was active when the change happened. */
 export function startAutosave() {
-  return useStore.subscribe((s, prev) => {
+  const schedule = () => {
+    const s = useStore.getState();
     if (!s.hydrated) return;
-    if (s.items === prev.items && s.history === prev.history) return;
     // Progress ticks change `items` many times a second; that's fine — debounced.
-    pending = { vault: getVault(), snap: { items: s.items, history: s.history } };
+    pending = { vault: getVault(), snap: { items: s.items, history: s.history, browser: useBrowser.getState().snapshot() } };
     window.clearTimeout(timer);
     timer = window.setTimeout(flush, 400);
+  };
+  const a = useStore.subscribe((s, prev) => {
+    if (s.items !== prev.items || s.history !== prev.history) schedule();
   });
+  const b = useBrowser.subscribe((s, prev) => {
+    // Only persist meaningful changes (not loading flags).
+    const key = (x: typeof s) => JSON.stringify([x.activeId, x.recent, x.tabs.map((t) => [t.id, t.index, t.history, t.title])]);
+    if (key(s) !== key(prev)) schedule();
+  });
+  return () => {
+    a();
+    b();
+  };
 }
 
 /**
