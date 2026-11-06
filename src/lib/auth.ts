@@ -173,7 +173,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     email = normEmail(email);
     name = name.trim();
     if (!name) throw new Error("Enter your name.");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter an email like name@example.com.");
     if (password.length < MIN_PASSWORD) throw new Error(`Use at least ${MIN_PASSWORD} characters.`);
     if (await findAccount(email)) throw new Error("An account with this email already exists on this device. Sign in instead.");
 
@@ -275,10 +275,10 @@ export const useAuth = create<AuthState>()((set, get) => ({
 
   changePassword: async (current, next) => {
     const user = get().user;
-    if (!user) throw new Error("Not signed in.");
+    if (!user) throw new Error("You’re signed out. Sign in again, then retry.");
     if (next.length < MIN_PASSWORD) throw new Error(`Use at least ${MIN_PASSWORD} characters.`);
     const acct = await findAccount(user.email);
-    if (!acct) throw new Error("Account not found.");
+    if (!acct) throw new Error("This account isn’t on this device anymore. Sign out and sign in again.");
     let dataKey: CryptoKey;
     try {
       // Extractable only for the instant it takes to re-wrap.

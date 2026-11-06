@@ -211,7 +211,18 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
         onMouseLeave={() => playing && setIdle(true)}
         style={{ cursor: idle && playing ? "none" : "default" }}
       >
-        <video ref={media} src={url} className="max-h-full max-w-full" onClick={toggle} onDoubleClick={toggleFull} playsInline {...events} />
+        <video ref={media} src={url} className="max-h-full max-w-full" playsInline aria-label={name} {...events} />
+        {/* Click the picture to play/pause, double-click for fullscreen — a real button, keyboard reachable. */}
+        <button
+          type="button"
+          className="absolute inset-0 focus-visible:outline-offset-[-4px]"
+          onClick={toggle}
+          onDoubleClick={toggleFull}
+          // Mouse convenience only: the control bar's play button is the keyboard/AT path.
+          tabIndex={-1}
+          aria-hidden
+          style={{ cursor: idle && playing ? "none" : "pointer" }}
+        />
         <AnimatePresence>
           {!playing && !error && (
             <motion.button
@@ -220,8 +231,9 @@ export function MediaPlayer({ url, blob, kind, name }: { url: string; blob?: Blo
               exit={{ opacity: 0, scale: 1.04 }}
               transition={t.base}
               onClick={toggle}
+              tabIndex={-1}
+              aria-hidden
               className="absolute flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.18] text-white backdrop-blur-[20px] transition-colors hover:bg-white/25"
-              aria-label="Play"
             >
               <Play aria-hidden size={26} fill="currentColor" strokeWidth={0} className="ml-1" />
             </motion.button>

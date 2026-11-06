@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { detectKind, extFromMime, extOf, FileKind, mimeFor, outputsFor } from "./formats";
 import { clearBlobs, deleteBlob, getBlob, putBlob } from "./db";
 import { convertReal } from "./converters";
-import { replaceExt, sha256, sleep, uid } from "./utils";
+import { fileStamp, replaceExt, sha256, sleep, uid } from "./utils";
 
 export type Status = "uploading" | "pending" | "queued" | "converting" | "ready" | "failed";
 
@@ -116,7 +116,7 @@ export const useStore = create<State>()((set, get) => ({
           let name = file.name;
           if (!name || name === "image.png" || !extOf(name)) {
             const ext = extFromMime(file.type || "application/octet-stream");
-            name = `${name ? name.replace(/\.[^.]+$/, "") : "Pasted"} ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }).replace(/:/g, ".")}.${ext}`;
+            name = `${name ? name.replace(/\.[^.]+$/, "") : "Pasted"} ${fileStamp()}.${ext}`;
           }
           const ext = extOf(name);
           const kind = detectKind(name, file.type);

@@ -42,7 +42,7 @@ export function Shelf() {
       const n = await downloadAllAsZip(items, (p) => setZipping(Math.round(p)));
       toast({ tone: "success", title: `Downloaded ${n} file${n > 1 ? "s" : ""}` });
     } catch (e) {
-      toast({ tone: "error", title: "Couldn’t create the ZIP", body: `${(e as Error).message}. Try again.` });
+      toast({ tone: "error", title: "Couldn’t create the ZIP", body: (e as Error).message });
     } finally {
       setZipping(null);
     }
@@ -118,7 +118,7 @@ export function Shelf() {
       </div>
 
       {/* List */}
-      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
         {visible.length ? (
           <ul aria-label="Files">
             <AnimatePresence initial={false} mode="popLayout">

@@ -1,9 +1,9 @@
-import { cn } from "@/lib/utils";
+import { cn, formatCount, formatDecimal } from "@/lib/utils";
 
 export function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <section className={cn("mt-8 first:mt-0", className)}>
-      <p className="eyebrow mb-3">{title}</p>
+      <h2 className="eyebrow mb-3">{title}</h2>
       {children}
     </section>
   );
@@ -32,7 +32,7 @@ export function Slider({
       <span className="flex justify-between text-footnote">
         <span>{label}</span>
         <span className="tabular-nums text-muted" aria-hidden>
-          {Number.isInteger(step) ? value : value.toFixed(1)}
+          {Number.isInteger(step) ? formatCount(value) : formatDecimal(value)}
           {unit}
         </span>
       </span>

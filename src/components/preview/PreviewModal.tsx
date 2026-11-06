@@ -5,7 +5,7 @@ import { origKey, outKey, useStore, FileItem } from "@/lib/store";
 import { useFocusTrap, useStoredBlob } from "@/lib/hooks";
 import { getParam, setParam } from "@/lib/router";
 import { detectKind, isBrowserImage, isTextual, KIND_LABEL, outputsFor } from "@/lib/formats";
-import { cn, formatBytes, formatDateTime, formatDuration } from "@/lib/utils";
+import { cn, formatBytes, formatCount, formatDateTime, formatDuration, formatSeconds } from "@/lib/utils";
 import { t } from "@/lib/motion";
 import { StatusBadge } from "../StatusBadge";
 import { ProgressBar } from "../ProgressBar";
@@ -269,7 +269,7 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
       {/* Convert */}
       <section>
         <div className="flex items-center justify-between">
-          <p className="eyebrow">Convert</p>
+          <h3 className="eyebrow">Convert</h3>
           <StatusBadge status={item.status} />
         </div>
         <div className="mt-3 flex items-center gap-3">
@@ -305,12 +305,12 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
 
       {item.output && (
         <section className="mt-10">
-          <p className="eyebrow mb-2">Output</p>
+          <h3 className="eyebrow mb-2">Output</h3>
           <dl>
             <Row k="Name" v={item.output.name} />
             <Row k="Size" v={`${formatBytes(item.output.size)}${item.output.simulated ? "" : ` · ${sizeDelta(item.size, item.output.size)}`}`} />
             <Row k="Engine" v={item.output.simulated ? "Simulated" : "On this device"} />
-            <Row k="Time" v={`${(item.output.durationMs / 1000).toFixed(1)} s`} />
+            <Row k="Time" v={formatSeconds(item.output.durationMs / 1000)} />
             <Row k="Type" v={item.output.mime} mono />
           </dl>
           {item.output.note && <p className="mt-3 text-footnote text-muted">{item.output.note}</p>}
@@ -318,12 +318,12 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
       )}
 
       <section className="mt-10">
-        <p className="eyebrow mb-2">Original</p>
+        <h3 className="eyebrow mb-2">Original</h3>
         <dl>
           <Row k="Name" v={item.name} />
           <Row k="Kind" v={KIND_LABEL[item.kind]} />
           <Row k="Type" v={item.mime || "unknown"} mono />
-          <Row k="Size" v={`${formatBytes(item.size)} (${item.size.toLocaleString()} bytes)`} />
+          <Row k="Size" v={`${formatBytes(item.size)} (${formatCount(item.size)}\u00A0bytes)`} />
           <Row k="Dimensions" v={item.width && item.height ? `${item.width} × ${item.height}` : undefined} />
           <Row k="Duration" v={item.duration ? formatDuration(item.duration) : undefined} />
           <Row k="Modified" v={formatDateTime(item.lastModified)} />
@@ -333,7 +333,7 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
 
       <section className="mt-10">
         <div className="mb-2 flex items-center justify-between">
-          <p className="eyebrow">SHA-256</p>
+          <h3 className="eyebrow">SHA-256</h3>
           {item.sha256 && (
             <button
               className="icon-btn -mr-2 h-7 w-7"

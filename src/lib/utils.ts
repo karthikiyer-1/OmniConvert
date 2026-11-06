@@ -23,6 +23,16 @@ export function formatBytes(bytes: number, digits = 1): string {
 }
 
 export const formatCount = (n: number) => fmtNumber(n, 0);
+export const formatDecimal = (n: number, digits = 1) =>
+  new Intl.NumberFormat(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n);
+/** "1.2 s" via Intl unit formatting. */
+export const formatSeconds = (s: number) =>
+  new Intl.NumberFormat(undefined, { style: "unit", unit: "second", unitDisplay: "narrow", maximumFractionDigits: 1 }).format(s);
+/** Time stamp safe for file names, e.g. "10.42.07". */
+export const fileStamp = (d = new Date()) =>
+  new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+    .format(d)
+    .replace(/[^\d]+/g, ".");
 
 export function formatDuration(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return "0:00";

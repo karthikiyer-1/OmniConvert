@@ -52,13 +52,11 @@ function OpenLanding() {
       </motion.section>
 
       <div className="grid gap-6 pb-24 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <motion.div
+        <motion.button
+        type="button"
           {...rise}
           transition={{ ...t.slow, delay: 0.05 }}
-          role="button"
-          tabIndex={0}
           onClick={() => input.current?.click()}
-          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
           onDragEnter={(e) => {
             e.preventDefault();
             depth.current++;
@@ -77,41 +75,42 @@ function OpenLanding() {
             take(e.dataTransfer.files);
           }}
           className={cn(
-            "surface group relative flex min-h-[420px] cursor-pointer flex-col items-center justify-center px-8 py-16 text-center transition-colors duration-400 ease-apple focus-visible:outline-offset-[-6px]",
+            "surface group relative flex w-full min-h-[420px] cursor-pointer flex-col items-center justify-center px-8 py-16 text-center transition-colors duration-400 ease-apple focus-visible:outline-offset-[-6px]",
             drag && "!bg-accent/[0.04]",
           )}
         >
-          <div
+          <span
             className={cn(
-              "pointer-events-none absolute inset-4 rounded-[20px] border-[1.5px] border-dashed border-accent/50 transition-opacity duration-400 ease-apple",
+              "pointer-events-none absolute inset-4 block rounded-[20px] border-[1.5px] border-dashed border-accent/50 transition-opacity duration-400 ease-apple",
               drag ? "opacity-100" : "opacity-0",
             )}
           />
-          <div
+          <span
             className={cn(
               "mb-8 flex h-16 w-16 items-center justify-center rounded-full transition-[transform,background-color,color] duration-400 ease-apple",
               drag ? "-translate-y-1 bg-accent text-white" : "bg-fg/[0.05] text-fg group-hover:-translate-y-0.5",
             )}
           >
             <ArrowUp aria-hidden size={26} strokeWidth={1.75} />
-          </div>
-          <p className="font-display text-title font-semibold">{drag ? "Release to Open" : "Drop a File to Open"}</p>
-          <p className="mt-2 text-callout text-muted">
+          </span>
+          <span className="block font-display text-title font-semibold">{drag ? "Release to Open" : "Drop a File to Open"}</span>
+          <span className="block mt-2 text-callout text-muted">
             or <span className="text-accent">choose a file</span>
-          </p>
-          <p className="mt-10 text-pretty text-footnote text-subtle">Images · Text &amp; code · Audio · Video · PDF · ZIP · anything else</p>
-          <input
-            ref={input}
-            type="file"
-            aria-label="Choose a file"
-            tabIndex={-1}
-            hidden
-            onChange={(e) => {
-              take(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </motion.div>
+          </span>
+          <span className="block mt-10 text-pretty text-footnote text-subtle">Images · Text &amp; code · Audio · Video · PDF · ZIP · anything else</span>
+        </motion.button>
+      <input
+        ref={input}
+        type="file"
+        aria-label="Choose a file"
+        tabIndex={-1}
+        hidden
+        onChange={(e) => {
+          take(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
 
         <motion.aside {...rise} transition={{ ...t.slow, delay: 0.1 }} className="surface flex min-h-[420px] flex-col p-6">
           <h2 className="font-display text-title font-semibold">From Your Files</h2>

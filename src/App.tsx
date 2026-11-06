@@ -3,6 +3,7 @@ import { MotionConfig, motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
 import { useStore } from "@/lib/store";
 import { t } from "@/lib/motion";
+import { fileStamp } from "@/lib/utils";
 import { Header } from "@/components/Header";
 import { Workspace, WorkspaceHandle } from "@/components/Workspace";
 import { Shelf } from "@/components/Shelf";
@@ -77,7 +78,7 @@ export default function App() {
             /* plain text */
           }
         }
-        const stamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }).replace(/:/g, ".");
+        const stamp = fileStamp();
         useStore
           .getState()
           .addFiles([new File([text], `Pasted text ${stamp}.${isJson ? "json" : "txt"}`, { type: isJson ? "application/json" : "text/plain" })]);

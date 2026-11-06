@@ -19,7 +19,7 @@ export async function downloadAllAsZip(items: FileItem[], onProgress?: (pct: num
     zip.file(name, blob, { date: new Date(it.output.finishedAt) });
     added++;
   }
-  if (!added) throw new Error("No converted files to export yet");
+  if (!added) throw new Error("Nothing’s been converted yet. Convert a file first.");
   const out = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, (m) =>
     onProgress?.(m.percent),
   );

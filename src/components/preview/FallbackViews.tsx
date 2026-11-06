@@ -178,7 +178,7 @@ export function InfoCard({ kind, name, blob, message }: { kind: FileKind; name: 
       </motion.div>
       {bytes && (
         <div className="mt-12 w-full max-w-xl">
-          <p className="eyebrow mb-3">First 256 bytes</p>
+          <h3 className="eyebrow mb-3">First 256 Bytes</h3>
           <div className="scroll-thin overflow-x-auto rounded-2xl bg-fg/[0.03] p-5 font-mono text-caption leading-6">
             {Array.from({ length: Math.ceil(bytes.length / 16) }).map((_, row) => {
               const slice = [...bytes.slice(row * 16, row * 16 + 16)];

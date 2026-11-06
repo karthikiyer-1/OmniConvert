@@ -234,12 +234,12 @@ function SignIn() {
           />
 
           <div className="space-y-3 pt-1">
-            <Switch checked={remember} onChange={setRemember} label="Stay signed in" detail="On this device for 30 days" />
+            <Switch checked={remember} onChange={setRemember} label="Stay Signed In" detail="On this device for 30 days" />
             {mode === "up" && guestFiles > 0 && (
               <Switch
                 checked={importGuest}
                 onChange={setImportGuest}
-                label={`Bring your ${guestFiles} file${guestFiles > 1 ? "s" : ""}`}
+                label={`Bring Your ${guestFiles} File${guestFiles > 1 ? "s" : ""}`}
                 detail="Move what’s on this page into the account"
               />
             )}

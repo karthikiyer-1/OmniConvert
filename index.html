@@ -15,6 +15,7 @@
         var t = localStorage.getItem("omni-theme");
         var dark = t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
         if (dark) document.documentElement.classList.add("dark");
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", dark ? "#000000" : "#f5f5f7");
       } catch (e) {}
     </script>
   </head>

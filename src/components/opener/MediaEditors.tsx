@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { captureFrame, decodeAudio, trimAudio } from "@/lib/converters";
 import { useStore } from "@/lib/store";
-import { cn, formatDuration } from "@/lib/utils";
+import { cn, formatDuration, formatSeconds } from "@/lib/utils";
 import type { OpenFile } from "@/lib/opener";
 import { Choice, Section } from "./Controls";
 import { download, editedName, saveToFiles } from "./actions";
@@ -125,7 +125,7 @@ export function AudioEditor({ file }: { file: OpenFile }) {
 
         <div className="mt-6 flex items-center justify-between text-footnote tabular-nums text-muted" aria-live="polite">
           <span>Start {formatDuration(start)}</span>
-          <span className="text-fg">{(end - start).toFixed(1)}\u00A0s selected</span>
+          <span className="text-fg">{formatSeconds(end - start)} selected</span>
           <span>End {formatDuration(end)}</span>
         </div>
 

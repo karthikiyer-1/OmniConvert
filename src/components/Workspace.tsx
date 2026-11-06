@@ -64,7 +64,8 @@ export const Workspace = forwardRef<WorkspaceHandle>(function Workspace(_, ref) 
   return (
     <section className="flex min-w-0 flex-col gap-6">
       {/* Dropzone */}
-      <motion.div
+      <motion.button
+        type="button"
         {...rise}
         transition={{ ...t.slow, delay: 0.05 }}
         onDragEnter={(e) => {
@@ -79,53 +80,51 @@ export const Workspace = forwardRef<WorkspaceHandle>(function Workspace(_, ref) 
         }}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
         className={cn(
-          "surface group relative flex min-h-[360px] cursor-pointer flex-col items-center justify-center px-8 py-16 text-center transition-colors duration-400 ease-apple focus-visible:outline-offset-[-6px]",
+          "surface group relative flex w-full min-h-[360px] cursor-pointer flex-col items-center justify-center px-8 py-16 text-center transition-colors duration-400 ease-apple focus-visible:outline-offset-[-6px]",
           drag && "!bg-accent/[0.04]",
         )}
       >
         {/* Drop target outline — only visible while dragging */}
-        <div
+        <span
           className={cn(
-            "pointer-events-none absolute inset-4 rounded-[20px] border-[1.5px] border-dashed border-accent/50 transition-opacity duration-400 ease-apple",
+            "pointer-events-none absolute inset-4 block rounded-[20px] border-[1.5px] border-dashed border-accent/50 transition-opacity duration-400 ease-apple",
             drag ? "opacity-100" : "opacity-0",
           )}
         />
 
-        <div
+        <span
           className={cn(
             "mb-8 flex h-16 w-16 items-center justify-center rounded-full transition-[transform,background-color,color] duration-400 ease-apple",
             drag ? "-translate-y-1 bg-accent text-white" : "bg-fg/[0.05] text-fg group-hover:-translate-y-0.5",
           )}
         >
           <ArrowUp aria-hidden size={26} strokeWidth={1.75} />
-        </div>
+        </span>
 
-        <p className="font-display text-title font-semibold">{drag ? "Release to Add" : "Drop Files Here"}</p>
-        <p className="mt-2 text-callout text-muted">
+        <span className="block font-display text-title font-semibold">{drag ? "Release to Add" : "Drop Files Here"}</span>
+        <span className="block mt-2 text-callout text-muted">
           or <span className="text-accent transition-opacity group-hover:opacity-80">choose files</span> from your device
-        </p>
-        <p className="mt-10 flex items-center gap-2 text-footnote text-subtle">
+        </span>
+        <span className="mt-10 flex items-center gap-2 text-footnote text-subtle">
           Paste with <span className="kbd">⌘&nbsp;V</span>
-        </p>
+        </span>
+      </motion.button>
 
-        <input
-          ref={inputRef}
-          type="file"
-          aria-label="Choose files"
-          tabIndex={-1}
-          multiple
-          hidden
-          onChange={(e) => {
-            const files = [...(e.target.files ?? [])];
-            if (files.length) addFiles(files);
-            e.target.value = "";
-          }}
-        />
-      </motion.div>
+      <input
+        ref={inputRef}
+        type="file"
+        aria-label="Choose files"
+        tabIndex={-1}
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          if (files.length) addFiles(files);
+          e.target.value = "";
+        }}
+      />
+
 
       {/* Conversion panel */}
       <motion.section {...rise} transition={{ ...t.slow, delay: 0.1 }} className="surface p-6 md:p-8" aria-labelledby="convert-heading">
