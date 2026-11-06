@@ -9,10 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "framer-motion": "^11.11.9",
+    "gifenc": "^1.0.3",
+    "heic-to": "^1.6.7",
     "highlight.js": "^11.10.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.453.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^4.5.5"

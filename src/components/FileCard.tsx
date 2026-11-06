@@ -45,7 +45,7 @@ function Meta({ item }: { item: FileItem }) {
             {Math.abs(pct)}%)
           </span>
         )}
-        {item.output.simulated && " · Simulated"}
+        {item.output.simulated && " · Preview copy"}
       </>
     );
   }

@@ -9,10 +9,10 @@ import { rise, t } from "@/lib/motion";
 
 /* Sites known to allow embedding — shown on the start page. */
 const SUGGESTIONS: { title: string; url: string; detail: string }[] = [
+  { title: "Google", url: "https://www.google.com/webhp?igu=1", detail: "Search, in its embeddable mode" },
+  { title: "Google Maps", url: "https://maps.google.com/maps?q=world&z=2&output=embed", detail: "Maps & places" },
   { title: "Wikipedia", url: "https://en.m.wikipedia.org/wiki/Main_Page", detail: "The free encyclopedia" },
-  { title: "OpenStreetMap", url: "https://www.openstreetmap.org/export/embed.html?bbox=-0.20%2C51.48%2C-0.04%2C51.54&layer=mapnik", detail: "Interactive world map" },
-  { title: "Internet Archive", url: "https://archive.org", detail: "Books, music & the Wayback Machine" },
-  { title: "Example Domain", url: "https://example.com", detail: "A simple test page" },
+  { title: "OpenStreetMap", url: "https://www.openstreetmap.org/export/embed.html?bbox=-0.20%2C51.48%2C-0.04%2C51.54&layer=mapnik", detail: "Open world map" },
 ];
 
 function Monogram({ url, size = 18, label }: { url: string | null; size?: number; label?: string }) {
@@ -395,7 +395,7 @@ function StartPage({ tabId }: { tabId: string }) {
         Browse the Web.
       </motion.h2>
       <motion.p {...rise} transition={{ ...t.slow, delay: 0.05 }} className="mt-4 max-w-[520px] text-pretty text-lead text-muted">
-        Type an address or a search above. Pages open right here, in tabs. YouTube links play in its embeddable player.
+        Type an address or a search above. Pages open right here, in tabs. Links to YouTube, Google Maps, Docs, Vimeo and Spotify open in their embeddable versions automatically.
       </motion.p>
 
       <motion.div {...rise} transition={{ ...t.slow, delay: 0.1 }} className="mt-12 grid gap-10 md:grid-cols-2">
@@ -432,7 +432,7 @@ function StartPage({ tabId }: { tabId: string }) {
         </section>
       </motion.div>
       <p className="mt-16 text-pretty text-caption text-subtle">
-        Some sites, like Google and GitHub, don’t allow being shown inside other websites. When that happens, open them in a new browser tab.
+        Some sites, like GitHub and most social networks, don’t allow being shown inside other websites. OmniConvert tells you before loading; if a link inside a page leads to one, your browser shows “refused to connect” — use Open in New Tab.
       </p>
     </div>
   );

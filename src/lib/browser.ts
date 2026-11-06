@@ -45,7 +45,10 @@ export const currentUrl = (t: BrowserTab | undefined) => (t && t.index >= 0 ? t.
 
 /* ---------------------------------------------------------- input parsing */
 
-const SEARCH = (q: string) => `https://duckduckgo.com/?q=${encodeURIComponent(q)}`;
+/** Google serves an embeddable results page when `igu=1` is set. */
+const SEARCH = (q: string) => `https://www.google.com/search?igu=1&q=${encodeURIComponent(q)}`;
+const GOOGLE_HOME = "https://www.google.com/webhp?igu=1";
+const isGoogle = (h: string) => /^(www\.)?google\.[a-z.]+$/.test(h);
 
 function youtubeId(u: URL): string | null {
   const host = u.hostname.replace(/^www\.|^m\./, "");
@@ -69,26 +72,69 @@ export function resolveInput(raw: string): { url: string; note?: string } | null
     candidate = `https://${text}`;
   if (!candidate) return { url: SEARCH(text) };
   try {
-    const u = new URL(candidate);
-    const yt = youtubeId(u);
-    if (yt && /^[\w-]{6,}$/.test(yt)) {
-      const start = u.searchParams.get("t")?.replace(/s$/, "");
-      return {
-        url: `https://www.youtube-nocookie.com/embed/${yt}${start && /^\d+$/.test(start) ? `?start=${start}` : ""}`,
-        note: "Opened in YouTube’s embeddable player",
-      };
-    }
-    return { url: u.toString() };
+    return embeddable(new URL(candidate));
   } catch {
     return { url: SEARCH(text) };
   }
 }
 
+/**
+ * Many services block framing on their normal pages but offer an official
+ * embeddable version. Rewrite links to those versions.
+ */
+function embeddable(u: URL): { url: string; note?: string } {
+  const host = u.hostname.toLowerCase();
+  const yt = youtubeId(u);
+  if (yt && /^[\w-]{6,}$/.test(yt)) {
+    const start = u.searchParams.get("t")?.replace(/s$/, "");
+    return {
+      url: `https://www.youtube-nocookie.com/embed/${yt}${start && /^\d+$/.test(start) ? `?start=${start}` : ""}`,
+      note: "Opened in YouTube’s embeddable player",
+    };
+  }
+  // Google Maps → the embed endpoint.
+  if ((isGoogle(host) && u.pathname.startsWith("/maps")) || host === "maps.google.com") {
+    const place = u.pathname.match(/\/maps\/(?:place|search)\/([^/]+)/)?.[1];
+    const at = u.pathname.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    const q = u.searchParams.get("q") ?? (place ? decodeURIComponent(place.replace(/\+/g, " ")) : at ? `${at[1]},${at[2]}` : "");
+    if (u.searchParams.get("output") === "embed") return { url: u.toString() };
+    return { url: `https://maps.google.com/maps?q=${encodeURIComponent(q || "world")}&output=embed`, note: "Opened in Google Maps’ embeddable view" };
+  }
+  // Google Search / home → embeddable mode.
+  if (isGoogle(host) && (u.pathname === "/" || u.pathname === "/webhp" || u.pathname === "/search")) {
+    const q = u.searchParams.get("q");
+    return { url: q ? SEARCH(q) : GOOGLE_HOME };
+  }
+  // Google Docs / Sheets / Slides / Drive files → preview mode.
+  const doc = host === "docs.google.com" && u.pathname.match(/^\/(document|spreadsheets|presentation)\/d\/([\w-]+)/);
+  if (doc) return { url: `https://docs.google.com/${doc[1]}/d/${doc[2]}/preview`, note: "Opened in Google’s preview mode (view only)" };
+  const drive = host === "drive.google.com" && u.pathname.match(/^\/file\/d\/([\w-]+)/);
+  if (drive) return { url: `https://drive.google.com/file/d/${drive[1]}/preview`, note: "Opened in Google Drive’s preview mode" };
+  // Vimeo / Spotify → their players.
+  const vimeo = /(^|\.)vimeo\.com$/.test(host) && host !== "player.vimeo.com" && u.pathname.match(/^\/(\d+)/);
+  if (vimeo) return { url: `https://player.vimeo.com/video/${vimeo[1]}`, note: "Opened in Vimeo’s player" };
+  const spotify = host === "open.spotify.com" && u.pathname.match(/^\/(?:intl-\w+\/)?(track|album|playlist|episode|show|artist)\/(\w+)/);
+  if (spotify) return { url: `https://open.spotify.com/embed/${spotify[1]}/${spotify[2]}`, note: "Opened in Spotify’s player" };
+  return { url: u.toString() };
+}
+
+const FRIENDLY: Record<string, string> = {
+  "maps.google.com": "Google Maps",
+  "docs.google.com": "Google Docs",
+  "drive.google.com": "Google Drive",
+  "www.youtube-nocookie.com": "YouTube",
+  "player.vimeo.com": "Vimeo",
+  "open.spotify.com": "Spotify",
+};
+
 export function hostOf(url: string | null): string {
   if (!url) return "";
   try {
     const u = new URL(url);
-    if (u.hostname === "duckduckgo.com" && u.searchParams.get("q")) return `Search: ${u.searchParams.get("q")}`;
+    if (isGoogle(u.hostname) && u.pathname === "/search" && u.searchParams.get("q")) return `Search: ${u.searchParams.get("q")}`;
+    if (isGoogle(u.hostname)) return "Google";
+    const friendly = FRIENDLY[u.hostname];
+    if (friendly) return friendly;
     return u.hostname.replace(/^www\./, "");
   } catch {
     return url;
@@ -100,8 +146,12 @@ export function prettyUrl(url: string | null): string {
   if (!url) return "";
   try {
     const u = new URL(url);
-    // Searches show the words, like Safari does.
-    if (u.hostname === "duckduckgo.com" && u.pathname === "/" && u.searchParams.get("q")) return u.searchParams.get("q")!;
+    // Searches show the words, like Safari does; embed flags stay out of sight.
+    if (isGoogle(u.hostname) && u.pathname === "/search" && u.searchParams.get("q")) return u.searchParams.get("q")!;
+    if (isGoogle(u.hostname) && u.pathname === "/webhp") return "google.com";
+    if (u.hostname === "maps.google.com" && u.searchParams.get("output") === "embed")
+      return `Google Maps · ${u.searchParams.get("q") ?? ""}`.replace(/ · $/, "");
+    u.searchParams.delete("igu");
     const path = u.pathname === "/" && !u.search ? "" : decodeURI(u.pathname);
     return u.host.replace(/^www\./, "") + path + u.search;
   } catch {
@@ -170,7 +220,7 @@ export const useBrowser = create<BrowserState>()((set, get) => ({
     let detail: string | undefined;
     try {
       const u = new URL(url);
-      detail = u.hostname === "duckduckgo.com" ? undefined : (decodeURI(u.pathname) + u.search).replace(/^\/$/, "") || undefined;
+      detail = isGoogle(u.hostname) || u.hostname === "maps.google.com" ? undefined : (decodeURI(u.pathname) + u.search).replace(/^\/$/, "") || undefined;
     } catch {
       /* ignore */
     }

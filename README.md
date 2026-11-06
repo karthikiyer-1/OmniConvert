@@ -55,9 +55,10 @@ The app has four sections: **Convert**, **Open**, **Browse** and **Account**. It
 - Tabs, back/forward history and recently visited sites are saved, and
   encrypted with everything else for signed-in accounts. The open page is
   in the URL (`#/browse?url=…`).
-- YouTube links (`watch`, `youtu.be`, `shorts`) open in YouTube's
-  privacy-enhanced embed player, which is allowed inside other sites.
-- **Limit:** many sites (Google, GitHub, most social networks) forbid being
+- Searches use Google in its embeddable mode (`igu=1`). Links to YouTube,
+  Google Maps, Google Docs/Sheets/Slides, Google Drive files, Vimeo and Spotify
+  are rewritten to each service's official embeddable version.
+- **Limit:** many sites (GitHub, most social networks, banks) forbid being
   shown inside another website, and browsers enforce that. OmniConvert
   detects this before loading and shows a "Can't Be Shown Here" card with
   **Open in New Tab** instead of a blank frame.
@@ -140,31 +141,37 @@ It only fetches public `http(s)` addresses on standard ports: every redirect
 hop is checked against private, loopback and link-local ranges (including
 cloud metadata IPs), and the connection is pinned to the checked IP.
 
-## Real and simulated conversions
+## Conversions
 
-The browser does these conversions itself (marked **On-device** in the
-format picker):
+These run for real, on your device (marked with a hint like "192 kbps" in the format menu):
 
 | From | To |
 |---|---|
-| Images (PNG, JPG, WEBP, GIF, BMP, SVG, AVIF, ICO) | PNG, JPG, WEBP, BMP, ICO, PDF |
-| Video | PNG/JPG poster frame, WAV audio track |
-| Audio | WAV (16-bit PCM) |
-| CSV / TSV | JSON, CSV, TSV, HTML table, Markdown table, PDF |
+| Images (PNG, JPG, WEBP, GIF, BMP, SVG, AVIF, ICO) and iPhone **HEIC/HEIF** | PNG, JPG, WEBP, BMP, ICO, PDF, GIF |
+| Video | **MP3**, **animated GIF** (first 15 s), **MP4**, **WEBM**, WAV, PNG/JPG frame |
+| Audio | **MP3** (192 kbps), WAV, and WEBM / M4A / OGG / OPUS where the browser can record them |
+| PDF | TXT, **DOCX**, HTML, Markdown, PNG/JPG (pages stacked, up to 10) |
+| DOCX, ODT, PPTX | TXT, PDF, HTML, Markdown, DOCX |
+| XLSX | CSV, TSV, JSON, HTML, Markdown, PDF |
+| CSV / TSV | **XLSX**, JSON, CSV, TSV, HTML, Markdown, PDF |
 | JSON | CSV, YAML, pretty JSON |
-| Text / code | PDF, highlighted HTML, Markdown, TXT, JSON |
-| ZIP / any file | ZIP (re-packed / compressed) |
+| Text / code | PDF, **DOCX**, highlighted HTML, Markdown, TXT, JSON |
+| ZIP / any file | ZIP |
 
-Everything else (HEIC, MP4→GIF, PDF→DOCX and so on) goes through a
-**simulated conversion**, marked **Cloud** in the picker. It shows realistic
-progress, can hit an interruption and retry on its own, and fails after three
-retries. If an on-device encoder fails (for example, a codec the browser can't
-decode), the app falls back to the simulated conversion.
+How it works: MP3 uses the LAME encoder (lamejs), GIFs use gifenc, HEIC uses
+libheif compiled to WebAssembly, and PDFs use Mozilla's pdf.js. DOCX/XLSX are
+written as standard Office Open XML. WEBM/MP4/M4A/OGG/OPUS are re-encoded by
+playing the media silently and recording it with the browser's
+`MediaRecorder`, so they take about as long as the clip. MP4 asks for H.264 +
+AAC first. The heavy libraries only download when you convert a file that
+needs them.
 
-**Simulated outputs only contain the original file's bytes under the new name
-and extension.** They are labelled "sim" on the shelf and "Cloud (simulated)"
-in the previewer. To add real conversions, put a server-side converter behind
-the simulated path in `src/lib/store.ts` (`runJob`).
+A few targets have no browser encoder (HEIC/AVIF/TIFF output, FLAC, MOV,
+EPUB, 7Z, fonts, and anything a particular browser can't record). These are
+labelled **Preview only**. Choosing one makes a clearly marked preview copy
+that still contains the original data, and the file list says so. Real
+conversions that fail (an unsupported codec, a scanned PDF with no text) say
+why and what to try instead.
 
 ## Keyboard shortcuts
 

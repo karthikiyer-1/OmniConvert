@@ -214,7 +214,7 @@ function PreviewBody({ item, items }: { item: FileItem; items: FileItem[] }) {
             {viewer}
             {showingOutput && item.output!.simulated && (
               <div className="material pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full px-4 py-1.5 text-caption text-muted">
-                Simulated {item.output!.ext.toUpperCase()} · showing the original
+                Preview copy · {item.output!.ext.toUpperCase()} can’t be encoded in a browser
               </div>
             )}
           </motion.div>
@@ -309,7 +309,7 @@ function InfoPanel({ item, onRemove, onDownload }: { item: FileItem; onRemove: (
           <dl>
             <Row k="Name" v={item.output.name} />
             <Row k="Size" v={`${formatBytes(item.output.size)}${item.output.simulated ? "" : ` · ${sizeDelta(item.size, item.output.size)}`}`} />
-            <Row k="Engine" v={item.output.simulated ? "Simulated" : "On this device"} />
+            <Row k="Engine" v={item.output.simulated ? "Preview copy (not converted)" : "On this device"} />
             <Row k="Time" v={formatSeconds(item.output.durationMs / 1000)} />
             <Row k="Type" v={item.output.mime} mono />
           </dl>

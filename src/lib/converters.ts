@@ -12,15 +12,97 @@ export interface ConvertInput {
   target: string;
 }
 
-export async function convertReal(input: ConvertInput): Promise<Blob> {
-  const { kind, ext, target } = input;
-  if (kind === "image" && isBrowserImage(ext)) return convertImage(input.blob, target);
-  if (kind === "video" && (target === "png" || target === "jpg")) return posterFrame(input.blob, target);
-  if ((kind === "audio" || kind === "video") && target === "wav") return toWav(input.blob);
+export type Progress = (fraction: number, stage?: string) => void;
+
+const paragraphsToText = (paras: string[]) => paras.join("\n\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+
+/** Route a conversion to the right on-device encoder. Throws if none applies. */
+export async function convertReal(input: ConvertInput, onProgress?: Progress, signal?: AbortSignal): Promise<Blob> {
+  const { kind, ext, target, blob } = input;
+
+  if (kind === "image") {
+    if (ext === "heic" || ext === "heif") {
+      onProgress?.(0.1, "Decoding HEIC photo…");
+      const png = await (await import("./docs")).decodeHeic(blob);
+      onProgress?.(0.8, `Encoding ${target.toUpperCase()}…`);
+      return target === "png" ? png : convertImage(png, target);
+    }
+    if (isBrowserImage(ext)) return convertImage(blob, target);
+  }
+
+  if (kind === "video") {
+    const media = await import("./media");
+    if (target === "png" || target === "jpg") return posterFrame(blob, target);
+    if (target === "wav") return toWav(blob);
+    if (target === "mp3") return media.toMp3(blob, onProgress, signal);
+    if (target === "gif") return media.toGif(blob, onProgress, signal);
+    if (target === "webm" || target === "mp4") return media.recordAs(blob, target, true, onProgress, signal);
+  }
+
+  if (kind === "audio") {
+    const media = await import("./media");
+    if (target === "wav") return toWav(blob);
+    if (target === "mp3") return media.toMp3(blob, onProgress, signal);
+    if (["m4a", "ogg", "opus", "webm"].includes(target)) return media.recordAs(blob, target, false, onProgress, signal);
+  }
+
+  if (kind === "pdf") {
+    const docs = await import("./docs");
+    if (target === "png" || target === "jpg") return (await docs.pdfImage(blob, target, onProgress)).blob;
+    const pages = await docs.pdfText(blob, onProgress);
+    if (!pages.some((p) => p.trim()))
+      throw new Error("This PDF has no selectable text (it’s probably scanned images). Convert it to PNG or JPG instead.");
+    return textOut(pages, input, target);
+  }
+
+  if (kind === "document" && ["docx", "odt", "pptx"].includes(ext)) {
+    onProgress?.(0.3, `Reading ${ext.toUpperCase()}…`);
+    const paras = await (await import("./docs")).officeText(blob, ext);
+    return textOut(paras, input, target);
+  }
+
+  if (kind === "spreadsheet" && ext === "xlsx") {
+    onProgress?.(0.3, "Reading workbook…");
+    const rows = await (await import("./docs")).xlsxRows(blob);
+    const csv = rows.map((r) => r.map((c) => csvCell(c, ",")).join(",")).join("\n") + "\n";
+    return convertText({ ...input, blob: new Blob([csv], { type: "text/csv" }), ext: "csv" });
+  }
+
+  if (kind === "spreadsheet" && target === "xlsx" && (ext === "csv" || ext === "tsv")) {
+    const rows = parseDelimited(await blob.text(), ext === "tsv" ? "\t" : ",");
+    return (await import("./docs")).buildXlsx(rows);
+  }
+
+  if ((kind === "text" || kind === "code") && target === "docx") {
+    return (await import("./docs")).buildDocx((await blob.text()).split(/\r?\n/), input.name);
+  }
+
   if (kind === "text" || kind === "code" || kind === "spreadsheet") return convertText(input);
-  if (kind === "archive" && ext === "zip" && target === "zip") return repackZip(input.blob);
-  if (target === "zip") return zipSingle(input.blob, input.name);
-  throw new Error(`No native converter for ${ext} → ${target}`);
+  if (kind === "archive" && ext === "zip" && target === "zip") return repackZip(blob);
+  if (target === "zip") return zipSingle(blob, input.name);
+  throw new Error(`No on-device converter for ${ext.toUpperCase()} → ${target.toUpperCase()}`);
+}
+
+/** Write extracted paragraphs as TXT / Markdown / HTML / PDF / DOCX. */
+async function textOut(paras: string[], input: ConvertInput, target: string): Promise<Blob> {
+  const title = input.name.replace(/\.[^.]+$/, "");
+  const text = paragraphsToText(paras);
+  switch (target) {
+    case "txt":
+      return new Blob([text], { type: "text/plain;charset=utf-8" });
+    case "md":
+      return new Blob([`# ${title}\n\n${text}`], { type: "text/markdown;charset=utf-8" });
+    case "html":
+      return new Blob(
+        [htmlPage(title, paras.filter((p) => p.trim()).map((p) => `<p>${escHtml(p).replace(/\n/g, "<br>")}</p>`).join("\n"))],
+        { type: "text/html;charset=utf-8" },
+      );
+    case "pdf":
+      return textPdf(text, title);
+    case "docx":
+      return (await import("./docs")).buildDocx(paras, title);
+  }
+  throw new Error(`No on-device converter for ${input.ext.toUpperCase()} → ${target.toUpperCase()}`);
 }
 
 /* ------------------------------------------------------------------ images */
@@ -83,6 +165,16 @@ async function convertImage(blob: Blob, target: string): Promise<Blob> {
     case "ico": {
       const { c } = canvasFor(img, 256);
       return encodeIco(await toBlob(c, "image/png"), c.width, c.height);
+    }
+    case "gif": {
+      const { GIFEncoder, quantize, applyPalette } = await import("gifenc");
+      const { ctx, w, h } = canvasFor(img, 2048);
+      const { data } = ctx.getImageData(0, 0, w, h);
+      const palette = quantize(data, 256, { format: "rgba4444" });
+      const gif = GIFEncoder();
+      gif.writeFrame(applyPalette(data, palette, "rgba4444"), w, h, { palette, transparent: true });
+      gif.finish();
+      return new Blob([gif.bytes()], { type: "image/gif" });
     }
     case "pdf": {
       const { c, w, h } = canvasFor(img, 4096, true);

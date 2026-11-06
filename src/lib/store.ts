@@ -426,61 +426,53 @@ async function runJob(id: string) {
   };
 
   try {
-    update({ status: "converting", progress: 0, stage: "Connecting to engine…" });
+    update({ status: "converting", progress: 2, stage: "Reading file…" });
     const source = await getBlob(origKey(id));
     if (!source) throw new Error("The original file is missing. Add it again from your device.");
 
-    // Simulated streams scale with size; real ones finish when the work does.
-    const workMs = Math.min(9000, 1400 + item.size / 900_000);
-    await ramp(0, 12, 380, `Uploading ${item.ext.toUpperCase() || "file"} to worker…`);
-    await ramp(12, 26, 420, "Analyzing streams & metadata…");
-
     let output: Blob | undefined;
-    let simulated = !fmt?.real;
+    const simulated = !fmt?.real;
     let note: string | undefined;
 
-    if (fmt?.real) {
+    if (!simulated) {
+      // Real conversion: show the encoder's own progress when it reports
+      // one, otherwise an eased estimate that never claims to be done early.
       let finished = false;
       let failure: unknown;
-      const job = convertReal({ blob: source, name: item.name, ext: item.ext, kind: item.kind, target })
+      let real: { f: number; stage?: string } | null = null;
+      const job = convertReal(
+        { blob: source, name: item.name, ext: item.ext, kind: item.kind, target },
+        (f, stage) => (real = { f, stage }),
+        ctrl.signal,
+      )
         .then((b) => (output = b))
         .catch((e) => (failure = e))
         .finally(() => (finished = true));
-      await ramp(26, 88, Math.min(workMs, 2600), `Encoding ${target.toUpperCase()}…`, () => finished);
+      const started = performance.now();
+      const expected = 600 + item.size / 3000; // ms — rough guess for small, fast jobs
+      while (!finished) {
+        const r = real as { f: number; stage?: string } | null;
+        const guess = 0.9 * (1 - Math.exp(-(performance.now() - started) / expected));
+        update({ progress: Math.round(4 + 92 * (r ? r.f : guess)), stage: r?.stage ?? `Converting to ${target.toUpperCase()}…` });
+        await sleep(120);
+      }
       await job;
+      if (ctrl.signal.aborted) throw new Cancelled();
       if (failure) {
-        // JSON/CSV parse errors are user-data problems: fail loudly.
-        if (failure instanceof SyntaxError) throw new Error(`The file isn’t valid (${failure.message}). Fix it in the Open tab, then convert again.`);
-        simulated = true;
-        note = `Native encoder unavailable (${(failure as Error).message}). Used the cloud fallback stream.`;
-        update({ stage: "Falling back to cloud worker…" });
-        await sleep(700);
+        const msg = (failure as Error).message || String(failure);
+        if (failure instanceof SyntaxError) throw new Error(`The file isn’t valid (${msg}). Fix it in the Open tab, then convert again.`);
+        throw new Error(`${msg.replace(/\.$/, "")}. Try a different format, or a file this browser can open.`);
       }
-    }
-
-    if (simulated) {
-      let hiccups = 0;
-      const chunks = 4;
-      for (let c = 0; c < chunks; c++) {
-        const from = 26 + ((88 - 26) * c) / chunks;
-        const to = 26 + ((88 - 26) * (c + 1)) / chunks;
-        await ramp(from, to, workMs / chunks, `Transcoding to ${target.toUpperCase()} · segment ${c + 1}/${chunks}`);
-        if (Math.random() < (hiccups ? 0.25 : 0.1)) {
-          hiccups++;
-          if (hiccups > 3) throw new Error("The conversion service timed out after 3 attempts. Try again in a moment.");
-          update({ stage: `Stream interrupted — retrying (${hiccups}/3)…` });
-          await sleep(900 + hiccups * 400);
-          c--; // replay the segment
-        }
-      }
-      // Demo output: the source bytes re-labelled with the target type.
+    } else {
+      // No browser encoder exists for this format: make a clearly labelled preview copy.
+      await ramp(4, 96, 900, `Preparing a preview copy (${target.toUpperCase()} encoding isn’t available in browsers)…`);
       output = new Blob([source], { type: mimeFor(target) });
-      note = note ?? "Simulated conversion — the output contains the original bytes.";
+      note = `${target.toUpperCase()} can’t be encoded in a browser, so this is a preview copy that still contains the original ${item.ext.toUpperCase()} data. Pick an “On device” format for a real conversion.`;
     }
 
-    await ramp(88, 97, 420, "Optimizing output…");
-    await ramp(97, 100, 220, "Finalizing…");
+    update({ progress: 98, stage: "Saving…" });
     await putBlob(outKey(id), output!);
+    if (target === "gif" && item.kind === "video" && (item.duration ?? 0) > 15) note = "GIFs include the first 15 seconds of the video.";
 
     const durationMs = Math.round(performance.now() - t0);
     useStore.getState().log("converted", item.name, `${item.ext.toUpperCase()} → ${target.toUpperCase()}${simulated ? " (simulated)" : ""}`);

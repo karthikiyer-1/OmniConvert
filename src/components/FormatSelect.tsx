@@ -141,7 +141,7 @@ export function FormatSelect({
                   >
                     <span className="flex w-4 justify-center text-accent">{selected && <Check aria-hidden size={14} strokeWidth={2.5} />}</span>
                     <span className="text-body font-medium">{o.label}</span>
-                    <span className="ml-auto truncate pl-2 text-caption text-subtle">{o.real ? o.hint ?? "" : "Simulated"}</span>
+                    <span className="ml-auto truncate pl-2 text-caption text-subtle">{o.real ? o.hint ?? "" : "Preview only"}</span>
                   </button>
                 );
               })}

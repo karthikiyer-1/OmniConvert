@@ -160,6 +160,15 @@ export function isBrowserImage(ext: string): boolean {
   return ["png", "jpg", "jpeg", "webp", "gif", "bmp", "ico", "svg", "avif"].includes(ext);
 }
 
+/** Can this browser record `target` (WEBM, MP4, M4A, OGG, OPUS) with MediaRecorder? */
+function canRecord(target: string, video: boolean): boolean {
+  if (typeof MediaRecorder === "undefined") return false;
+  const types: Record<string, string[]> = video
+    ? { webm: ["video/webm"], mp4: ["video/mp4"] }
+    : { webm: ["audio/webm"], m4a: ["audio/mp4"], ogg: ["audio/ogg;codecs=opus", "audio/ogg"], opus: ["audio/ogg;codecs=opus", "audio/webm;codecs=opus"] };
+  return (types[target] ?? []).some((t) => MediaRecorder.isTypeSupported(t));
+}
+
 const f = (ext: string, label: string, real: boolean, hint?: string): OutputFormat => ({
   ext,
   label,
@@ -171,7 +180,7 @@ export function outputsFor(kind: FileKind, ext: string): OutputFormat[] {
   let list: OutputFormat[] = [];
   switch (kind) {
     case "image": {
-      const decodable = isBrowserImage(ext);
+      const decodable = isBrowserImage(ext) || ext === "heic" || ext === "heif";
       list = [
         f("png", "PNG", decodable, "Lossless"),
         f("jpg", "JPG", decodable, "Small, photo"),
@@ -182,7 +191,7 @@ export function outputsFor(kind: FileKind, ext: string): OutputFormat[] {
         f("heic", "HEIC", false, "Apple High Efficiency"),
         f("avif", "AVIF", false, "Next-gen"),
         f("tiff", "TIFF", false, "Print"),
-        f("gif", "GIF", false),
+        f("gif", "GIF", decodable, "Still image"),
       ];
       break;
     }
@@ -190,46 +199,50 @@ export function outputsFor(kind: FileKind, ext: string): OutputFormat[] {
       list = [
         f("png", "PNG", true, "Poster frame"),
         f("jpg", "JPG", true, "Poster frame"),
-        f("gif", "GIF", false, "Animated"),
-        f("webm", "WEBM", false, "VP9"),
-        f("mp4", "MP4", false, "H.264"),
+        f("mp4", "MP4", canRecord("mp4", true), "H.264 · real time"),
+        f("webm", "WEBM", canRecord("webm", true), "VP9 · real time"),
+        f("gif", "GIF", true, "Animated · first 15 s"),
+        f("mp3", "MP3", true, "Extract audio"),
         f("mov", "MOV", false, "QuickTime"),
-        f("mp3", "MP3", false, "Extract audio"),
         f("wav", "WAV", true, "Extract audio"),
       ];
       break;
     case "audio":
       list = [
+        f("mp3", "MP3", true, "192 kbps"),
         f("wav", "WAV", true, "PCM 16-bit"),
-        f("mp3", "MP3", false, "320 kbps"),
-        f("m4a", "M4A", false, "AAC"),
-        f("ogg", "OGG", false, "Vorbis"),
+        f("m4a", "M4A", canRecord("m4a", false), "AAC · real time"),
+        f("ogg", "OGG", canRecord("ogg", false), "Opus · real time"),
+        f("opus", "OPUS", canRecord("opus", false), "Real time"),
+        f("webm", "WEBM", canRecord("webm", false), "Opus · real time"),
         f("flac", "FLAC", false, "Lossless"),
-        f("opus", "OPUS", false),
       ];
       break;
     case "pdf":
       list = [
-        f("docx", "DOCX", false, "Word"),
-        f("txt", "TXT", false, "Plain text"),
-        f("png", "PNG", false, "Page images"),
-        f("jpg", "JPG", false, "Page images"),
-        f("html", "HTML", false),
+        f("docx", "DOCX", true, "Word · text"),
+        f("txt", "TXT", true, "Plain text"),
+        f("png", "PNG", true, "Pages as image"),
+        f("jpg", "JPG", true, "Pages as image"),
+        f("html", "HTML", true),
+        f("md", "Markdown", true),
         f("epub", "EPUB", false),
       ];
       break;
-    case "document":
+    case "document": {
+      const readable = ["docx", "odt", "pptx"].includes(ext);
       list = [
-        f("pdf", "PDF", false),
-        f("docx", "DOCX", false),
-        f("txt", "TXT", false),
+        f("pdf", "PDF", readable, readable ? "Text" : undefined),
+        f("docx", "DOCX", readable),
+        f("txt", "TXT", readable),
+        f("html", "HTML", readable),
+        f("md", "Markdown", readable),
         f("odt", "ODT", false),
-        f("html", "HTML", false),
-        f("md", "Markdown", false),
       ];
       break;
+    }
     case "spreadsheet": {
-      const textual = ext === "csv" || ext === "tsv";
+      const textual = ext === "csv" || ext === "tsv" || ext === "xlsx";
       list = [
         f("json", "JSON", textual, "Array of rows"),
         f("csv", "CSV", textual),
@@ -237,7 +250,7 @@ export function outputsFor(kind: FileKind, ext: string): OutputFormat[] {
         f("html", "HTML", textual, "Table"),
         f("md", "Markdown", textual, "Table"),
         f("pdf", "PDF", textual),
-        f("xlsx", "XLSX", false, "Excel"),
+        f("xlsx", "XLSX", ext === "csv" || ext === "tsv", "Excel"),
       ];
       break;
     }
@@ -249,7 +262,7 @@ export function outputsFor(kind: FileKind, ext: string): OutputFormat[] {
         f("md", "Markdown", true),
         f("txt", "TXT", true),
         f("json", "JSON", true, "Wrapped string"),
-        f("docx", "DOCX", false),
+        f("docx", "DOCX", true, "Word"),
       ];
       if (ext === "json") list.unshift(f("csv", "CSV", true, "Flatten array"), f("yaml", "YAML", true));
       break;
@@ -272,8 +285,11 @@ export function outputsFor(kind: FileKind, ext: string): OutputFormat[] {
     default:
       list = [f("zip", "ZIP", true, "Compress"), f("txt", "TXT", false, "Hex dump")];
   }
-  // Never suggest converting to the same format (except re-pack).
-  return list.filter((o) => o.ext !== ext || kind === "archive").filter((o, i, a) => a.findIndex((x) => x.ext === o.ext) === i);
+  // Never suggest converting to the same format (except re-pack); real conversions first.
+  return list
+    .filter((o) => o.ext !== ext || kind === "archive")
+    .filter((o, i, a) => a.findIndex((x) => x.ext === o.ext) === i)
+    .sort((a, b) => Number(b.real) - Number(a.real));
 }
 
 export const KIND_LABEL: Record<FileKind, string> = {
