@@ -31,7 +31,7 @@ The app has four sections: **Convert**, **Open**, **Browse** and **Account**. It
   for the batch or one per file, then convert.
 - A two-worker queue with progress, stop, retry and re-convert. Statuses:
   Pending, Queued, Converting, Ready, Failed.
-- A Files list with filters, search and **Download All as ZIP**. Click a file
+- A Files list with filters, search and **Download All**. Click a file
   for a preview (zoomable images, custom audio/video players, highlighted
   text, CSV tables, PDF, ZIP contents, hex view) with full metadata and
   SHA-256.
@@ -202,7 +202,7 @@ src/
     persistence.ts         saves each vault (guest: localStorage, account: encrypted IndexedDB)
     router.ts / opener.ts  hash routes; the file open in the editor
     browser.ts             Browse tabs, per-tab history, address-bar parsing
-    exportZip.ts           "Download All as ZIP"
+    exportZip.ts           "Download All"
   components/
     Header, Workspace (dropzone + format bar), Shelf, FileCard, FormatSelect, Toasts
     AccountPage            sign in / create account, history, security

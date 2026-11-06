@@ -4,7 +4,7 @@ import { confirmAction } from "@/lib/confirm";
 import { AnimatePresence, motion } from "framer-motion";
 import { Search } from "lucide-react";
 import { useStore, type FileItem } from "@/lib/store";
-import { downloadAllAsZip } from "@/lib/exportZip";
+import { downloadAllSeparately } from "@/lib/downloadAll";
 import { formatBytes } from "@/lib/utils";
 import { t } from "@/lib/motion";
 import { FileCard } from "./FileCard";
@@ -36,13 +36,17 @@ export function Shelf() {
   const visible = items.filter((i) => matches(filter, i) && (!q || i.name.toLowerCase().includes(q.toLowerCase())));
   const readyBytes = items.reduce((n, i) => n + (i.output?.size ?? 0), 0);
 
-  const exportZip = async () => {
+  const downloadAll = async () => {
     setZipping(0);
     try {
-      const n = await downloadAllAsZip(items, (p) => setZipping(Math.round(p)));
-      toast({ tone: "success", title: `Downloaded ${n} file${n > 1 ? "s" : ""}` });
+      const n = await downloadAllSeparately(items, (done) => setZipping(done));
+      toast({
+        tone: "success",
+        title: `Downloaded ${n} file${n > 1 ? "s" : ""}`,
+        body: n > 1 ? "If some are missing, allow multiple downloads for this site" : undefined,
+      });
     } catch (e) {
-      toast({ tone: "error", title: "Couldn’t create the ZIP", body: (e as Error).message });
+      toast({ tone: "error", title: "Couldn’t download the files", body: (e as Error).message });
     } finally {
       setZipping(null);
     }
@@ -147,8 +151,8 @@ export function Shelf() {
       {/* Footer */}
       {counts.ready > 0 && (
         <div className="px-6 pb-6 pt-3">
-          <button className="btn-primary w-full" disabled={zipping !== null} onClick={exportZip}>
-            {zipping !== null ? `Compressing… ${zipping}%` : "Download All as ZIP"}
+          <button className="btn-primary w-full" disabled={zipping !== null} onClick={downloadAll} aria-busy={zipping !== null}>
+            {zipping !== null ? `Downloading ${zipping} of ${counts.ready}…` : counts.ready > 1 ? `Download All ${counts.ready} Files` : "Download File"}
           </button>
           <p className="mt-3 text-center text-caption tabular-nums text-subtle">
             {counts.ready} converted · {formatBytes(readyBytes)}
