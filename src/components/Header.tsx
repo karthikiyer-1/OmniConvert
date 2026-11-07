@@ -22,7 +22,6 @@ const SHORTCUTS: [string, string][] = [
 const NAV: [Route, string][] = [
   ["convert", "Convert"],
   ["open", "Open"],
-  ["browse", "Browse"],
 ];
 
 export function Header({ theme, onToggleTheme }: { theme: "light" | "dark"; onToggleTheme: () => void }) {
